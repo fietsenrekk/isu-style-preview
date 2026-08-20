@@ -1,0 +1,434 @@
+/*
+  LABI — ISU-STYLE PREVIEW
+  ========================
+
+  A pitch mockup reproducing the page composition and interaction model of
+  isu-antwerp.com with Labi's own wordmark, photograph and business data.
+
+  Every value here was measured off the live ISU site (its source HTML, its
+  css/style.css, and computed styles read in the browser) on 2026-08-17 —
+  none of it is eyeballed:
+
+    header        absolute, top 50px / right 100px, max-width 145px, right-aligned
+    tagline       Bebas Neue 22px, and hidden entirely on mobile
+    nav           absolute, bottom 80px / left 100px, Bebas Neue 22px;
+                  li margin-bottom 6px, line-height 20px, float + clear;
+                  ::before wipe in #888 driven by data-text, .35s ease-in
+    home figure   ~60% of viewport width, vertically centred
+    intro         Abel 16px / 20px, width 70%, max-width 640px, centred
+    prices box    500px wide, 6px black vertical rule down the centre,
+                  .desc 50% right-aligned / .value 50% left-aligned,
+                  both Bebas Neue 22px, padding 0 20px, item margin-bottom 5px
+    legend        Abel 16px / 19px, offset to calc(50% + 20px)
+    contact box   as prices, translateX(40px), .mt rows margin-top 25px,
+                  .value span Abel 16px block, padding-top 10px
+    mobile        burger 40x24 at left 7.5% / top 76px (3 bars: 50% / 100% / 50%),
+                  nav overlay background #888888, ul left 15% centred, li 7vw,
+                  boxes 100% wide in normal flow, rule 5px, cells padding 0 10px
+
+  ONE DELIBERATE CORRECTION, verified rather than copied. ISU's stylesheet
+  carries `#v-res.mobile … { font-size: 6vw }` and then `6vh` for the price and
+  contact cells. No element on the page has id="v-res" — "v-res" is a class on
+  <body> — so neither rule ever applies, and the size that actually renders on a
+  phone is 22px, confirmed by reading the computed style at a 375px viewport.
+  Copying 6vh literally would have set ~50px type inside a ~175px column and
+  overflowed every row. This uses the 22px that really renders.
+
+  TWO STRUCTURAL SIMPLIFICATIONS, visually identical but sturdier: vertical
+  centring is done with CSS grid rather than ISU's JS-assigned section heights,
+  and the legend sits in normal flow rather than absolutely positioned, so it
+  can never collide with the nav or overflow the viewport.
+*/
+
+/* ------------------------------------------------------------------ fonts */
+
+@font-face {
+  font-family: 'Bebas Neue';
+  src: url('fonts/bebas-neue-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Abel';
+  src: url('fonts/abel-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+/* ----------------------------------------------------------------- tokens */
+
+:root {
+  --paper: #fcfcfc;   /* sampled from ISU's body background */
+  --ink: #000;
+  --grey: #888;       /* ISU's nav wipe + mobile menu ground */
+  --display: 'Bebas Neue', 'Arial Narrow', Arial, sans-serif;
+  --text: 'Abel', Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--text);
+  line-height: 1;
+}
+p { margin: 0; }
+ul { margin: 0; padding: 0; list-style: none; }
+img { max-width: 100%; height: auto; border: 0; }
+a { color: inherit; text-decoration: none; }
+
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+.page { position: relative; min-height: 100svh; }
+
+/* An unobtrusive mockup marker, in the same register as ISU's own
+   "SITE: DMD Studio" credit — honest without wrecking the composition. */
+.preview-flag {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  z-index: 40;
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--grey);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- header -- */
+
+.head {
+  position: absolute;
+  top: 50px;
+  right: 100px;
+  max-width: 145px;
+  text-align: right;
+  z-index: 900;
+}
+.head__mark { display: block; margin: 0 0 25px 0; }
+.head__mark svg { width: 100%; height: auto; display: block; color: var(--ink); }
+.head__rule { display: block; height: 3px; background: var(--ink); margin-top: 6px; }
+.head__tagline {
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 1;
+}
+
+/* ------------------------------------------------------------------ main -- */
+
+#main-content {
+  position: relative;
+  width: 100%;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.section { display: none; width: 100%; grid-area: 1 / 1; }
+.section.is-active { display: block; }
+
+/* --------------------------------------------------------------- #home ---- */
+
+#home .figure {
+  width: min(60vw, 68rem);
+  aspect-ratio: 634 / 358;   /* ISU's own measured embed ratio */
+  margin: 0 auto;
+  overflow: hidden;
+}
+#home .figure img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /*
+    Biased up from centre. The source is 709x945 (3:4) and the desktop frame is
+    ~1.77:1, so covering it drops roughly 58% of the photo's height. Centred,
+    the crop cut through the forearm and lost the clippers and the hairline;
+    shifted up it keeps the hand, the clippers and the fade, and trims the lower
+    torso instead — the part of the frame doing the least work.
+  */
+  object-position: 50% 28%;
+  display: block;
+}
+
+/* -------------------------------------------------------------- #intro ---- */
+
+#intro .content {
+  width: 70%;
+  max-width: 640px;
+  margin: 0 auto;
+  font-family: var(--text);
+  font-size: 16px;
+  line-height: 20px;
+}
+#intro .content p + p { margin-top: 20px; }
+
+/* --------------------------------------------- #prices and #contact boxes -- */
+
+/*
+  The signature ISU layout: a 500px column with a 6px black rule straight down
+  the middle, labels right-aligned into it and values left-aligned off it.
+*/
+.box {
+  position: relative;
+  width: 500px;
+  margin: 0 auto;
+  padding: 40px 0 30px;
+}
+.box .rule {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  width: 6px;
+  height: 100%;
+  background: var(--ink);
+}
+.item { width: 100%; margin: 0 0 5px 0; }
+.item::after { content: ''; display: block; clear: both; }
+.item .desc,
+.item .value {
+  width: 50%;
+  float: left;
+  box-sizing: border-box;
+  padding: 0 20px;
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 22px;
+}
+.item .desc { text-align: right; }
+.item .value { text-align: left; }
+
+/*
+  Contact values float RIGHT, prices float LEFT. This is not a stylistic whim,
+  it is load-bearing, and ISU's stylesheet does exactly the same.
+
+  Several contact rows deliberately carry an empty label — the two address
+  lines, the Instagram row — so the value sits alone beside the rule. An empty
+  floated <p> has zero height, and a zero-height float reserves no vertical
+  band, so a following left-floated value slides right past it to the left edge
+  and lands on the WRONG side of the centre rule. Floating the value right pins
+  it to the right half whether or not its label has content.
+*/
+#contact .item .value { float: right; }
+.item .value a:hover { text-decoration: underline; }
+.item .value span {
+  font-family: var(--text);
+  display: block;
+  padding-top: 10px;
+  font-size: 16px;
+  line-height: 16px;
+}
+/* Group separation inside the contact list. */
+.item.mt { margin-top: 25px; }
+
+/* ISU keeps this to a single line that runs past the 500px column rather than
+   wrapping inside it; the copy is kept short enough that it cannot reach the
+   viewport edge even at the 900px breakpoint. */
+.legend {
+  margin-top: 30px;
+  margin-left: calc(50% + 20px);
+  font-family: var(--text);
+  font-size: 16px;
+  line-height: 19px;
+  white-space: nowrap;
+}
+
+#contact .box { transform: translateX(40px); }
+
+/* -------------------------------------------------------------------- nav -- */
+
+#main-navigation {
+  position: absolute;
+  bottom: 80px;
+  left: 100px;
+  z-index: 10;
+  font-family: var(--display);
+  font-size: 22px;
+}
+#main-navigation li {
+  margin: 0 0 6px 0;
+  cursor: pointer;
+  position: relative;
+  color: var(--ink);
+  float: left;
+  clear: both;
+  line-height: 20px;
+  white-space: nowrap;
+}
+/*
+  ISU's nav hover: a grey copy of the label, taken from data-text, wiping in
+  from the left over the black original.
+*/
+#main-navigation li::before {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--grey);
+  transition: width 0.35s ease-in;
+  transform-origin: left center;
+  width: 0%;
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+}
+#main-navigation li:hover::before,
+#main-navigation li.selected::before { width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  #main-navigation li::before { transition: none; }
+}
+
+/* ----------------------------------------------------------------- burger -- */
+
+#ico-nav {
+  display: none;
+  position: absolute;
+  left: 7.5%;
+  top: 76px;
+  width: 40px;
+  height: 24px;
+  z-index: 1001;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+#ico-nav span {
+  background: var(--ink);
+  height: 4px;
+  display: block;
+  position: absolute;
+  transition: all 0.25s ease-in;
+}
+#ico-nav .ln1 { width: 50%; top: 0; left: 0; }
+#ico-nav .ln2 { width: 100%; top: 0; bottom: 0; margin: auto 0; }
+#ico-nav .ln3 { width: 50%; bottom: 0; right: 0; }
+/* Collapses to an X, as ISU's does. */
+#ico-nav.open { width: 24px; }
+#ico-nav.open .ln1 { transform-origin: left bottom; transform: rotate(45deg); width: 55%; }
+#ico-nav.open .ln2 { transform-origin: center center; transform: rotate(-45deg); }
+#ico-nav.open .ln3 { transform-origin: right top; transform: rotate(45deg); width: 55%; left: 9px; }
+
+@media (prefers-reduced-motion: reduce) {
+  #ico-nav span { transition: none; }
+}
+
+#main-navigation-mobile {
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #888888;
+  font-family: var(--display);
+  z-index: 1000;
+}
+#main-navigation-mobile.open { display: block; }
+#main-navigation-mobile ul {
+  position: absolute;
+  left: 15%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+#main-navigation-mobile li {
+  margin: 0 0 2px 0;
+  cursor: pointer;
+  position: relative;
+  color: var(--ink);
+  float: left;
+  clear: both;
+  font-size: 7vw;
+  line-height: 7vw;
+}
+
+/* --------------------------------------------------- reservation page ----- */
+
+.reservation #main-content { display: grid; place-items: center; }
+#reservation-box { width: 500px; margin: 0 auto; padding: 40px 0 30px; }
+#reservation-box .box { padding-top: 0; }
+
+.reserve-cta {
+  display: block;
+  width: max-content;
+  margin: 34px auto 0;
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 22px;
+  color: var(--paper);
+  background: var(--ink);
+  padding: 9px 26px;
+  white-space: nowrap;
+}
+.reserve-cta:hover { background: var(--grey); }
+
+.reserve-note {
+  margin: 22px auto 0;
+  max-width: 420px;
+  text-align: center;
+  font-family: var(--text);
+  font-size: 16px;
+  line-height: 19px;
+  color: var(--ink);
+}
+
+#main-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 40px;
+  text-align: center;
+  font-family: var(--text);
+  font-size: 16px;
+  line-height: 20px;
+}
+#main-footer p + p { margin-top: 4px; }
+#main-footer a:hover { text-decoration: underline; }
+
+/* ---------------------------------------------------------------- mobile -- */
+
+@media (max-width: 900px) {
+  #ico-nav { display: block; }
+  #main-navigation { display: none; }
+
+  /* ISU hides the tagline entirely on mobile — only the mark remains. */
+  .head { top: 40px; right: 7.5%; max-width: 120px; }
+  .head__tagline { display: none; }
+  .head__mark { margin-bottom: 0; }
+
+  #main-content {
+    min-height: 0;
+    display: block;
+    padding: 150px 0 60px;
+  }
+
+  /* The photo runs full-bleed at its natural ratio, as ISU's does. */
+  #home .figure { width: 100%; aspect-ratio: auto; }
+  #home .figure img { height: auto; object-fit: fill; object-position: 50% 50%; }
+
+  #intro .content { width: 80%; }
+
+  .box {
+    width: 100%;
+    padding: 20px 0 18px;
+    transform: none;
+  }
+  #contact .box { transform: none; }
+  .box .rule { width: 5px; }
+  .item .desc, .item .value { padding: 0 10px; }
+
+  .legend {
+    width: 80%;
+    margin: 20px auto 0;
+    text-align: center;
+    white-space: normal;   /* ISU releases the nowrap below desktop too */
+  }
+
+  #reservation-box { width: 100%; padding: 20px 0 18px; }
+  .reservation #main-content { display: block; padding: 150px 0 140px; }
+  #main-footer { position: static; margin-top: 50px; }
+
+  .preview-flag { bottom: 8px; right: 8px; }
+}
