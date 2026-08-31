@@ -13,17 +13,16 @@
   lockup, a centred booking panel, and a footer carrying the address, the email
   and the Instagram handle.
 
-  ISU drops a third-party booking widget straight into an iframe on this page.
-  This does not, on purpose. Labi books through Setmore, and the Setmore
-  booking page loads Google Tag Manager, Meta, Clarity and a dozen advertising
-  pixels — embedding it would pull all of that into a preview that currently
-  makes zero third-party requests and sets no cookies, and would drag a consent
-  banner in with it. The three services are shown in the site's own visual
-  language instead, with a link out to the real Setmore page.
+  ISU drops a third-party booking widget straight into an iframe on this page,
+  and so does this. The frame is the real Setmore booking page, so availability,
+  services, durations and prices are live and every booking lands in the owner's
+  Setmore calendar the instant it is made - nothing to sync, no backend, and the
+  visitor never leaves the site. See the note above the iframe for the two
+  caveats that come with it.
 
-  Every service, price, duration and contact detail below is Labi's real data,
-  used as stand-in filler under the KIRU name by request. These links are live
-  and they reach Labi.
+  The address, email and Instagram handle in the footer are Labi's real ones,
+  used as stand-in filler under the KIRU name by request. They are live and they
+  reach Labi.
 -->
 <link rel="icon" href="assets/favicon.png" type="image/png">
 <link rel="stylesheet" href="assets/site.css">
@@ -31,6 +30,8 @@
 <body class="reservation">
 
 <div class="page">
+
+  <div id="curtain" class="idle" aria-hidden="true"><span class="bck"></span></div>
 
   <span class="preview-flag">PREVIEW MOCKUP</span>
 
@@ -41,6 +42,10 @@
           <source type="image/webp" srcset="assets/brand/kiru-logo.webp">
           <img src="assets/brand/kiru-logo.png" width="880" height="363" alt="KIRU — hair by night">
         </picture>
+          <span class="tapa tapa--word" aria-hidden="true"></span>
+          <span class="tapa tapa--line" aria-hidden="true"></span>
+          <span class="tapa tapa--tag" aria-hidden="true"></span>
+          <span class="tapa tapa--kanji" aria-hidden="true"></span>
       </a>
     </h1>
   </header>
@@ -48,29 +53,35 @@
   <main id="main-content">
     <section id="reservation-box" aria-label="Make a reservation">
 
-      <div class="box">
-        <span class="rule" aria-hidden="true"></span>
+      <!--
+        The real Setmore booking page, embedded.
 
-        <div class="item">
-          <p class="desc">SHORT HAIR</p>
-          <p class="value">35 &middot; 20 MIN</p>
-        </div>
-        <div class="item">
-          <p class="desc">MID-LENGTH HAIR</p>
-          <p class="value">40 &middot; 25 MIN</p>
-        </div>
-        <div class="item">
-          <p class="desc">LONG HAIR</p>
-          <p class="value">45 &middot; 30 MIN</p>
-        </div>
+        Setmore sends no X-Frame-Options and no frame-ancestors directive, so
+        the booking page can be framed cross-origin - verified by loading it in
+        a frame and confirming the flow renders, not assumed from the docs. It
+        IS Setmore, so availability, services and prices are live and every
+        booking lands in the owner's Setmore calendar the moment it is made.
+        Nothing to sync, no backend, and the visitor never leaves the site.
+
+        Two honest caveats, both the account owner's to settle:
+          - the frame renders in whatever theme the Setmore account is set to
+            (currently dark, against this paper page). Setmore > Booking Page >
+            appearance changes it.
+          - Setmore loads its own analytics and shows its own cookie notice
+            inside the frame. That is why the zero-third-party claim in the
+            README is scoped to every page except this one.
+      -->
+      <div class="booking">
+        <iframe
+          class="booking__frame"
+          src="https://labibookings.setmore.com/labibookings"
+          title="Book an appointment"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"></iframe>
       </div>
 
-      <a class="reserve-cta" href="https://labibookings.setmore.com/labibookings" target="_blank" rel="noopener noreferrer">MAKE A RESERVATION</a>
-
-      <p class="reserve-note">
-        Wash and blow-dry included on long hair. Book up to a month ahead, and
-        cancel or move an appointment up to 4 hours beforehand. The shop's own
-        policy, in its own words: &ldquo;No show is a no a go.&rdquo;
+      <p class="reserve-fallback">
+        Trouble with the form? <a href="https://labibookings.setmore.com/labibookings" target="_blank" rel="noopener noreferrer">Open the booking page directly</a>.
       </p>
 
     </section>
@@ -84,5 +95,15 @@
 
 </div>
 
+<script>
+(function () {
+  var root = document.documentElement;
+  root.className += (root.className ? ' ' : '') + 'js';
+  var page = document.querySelector('.page');
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () { page.classList.add('is-revealed'); });
+  });
+})();
+</script>
 </body>
 </html>

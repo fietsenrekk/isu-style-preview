@@ -6,8 +6,8 @@
   isu-antwerp.com with the KIRU lockup and a portrait from joruhairstudio.
 
   NOTE ON CONTENT: the address, phone, email, Instagram, opening hours and
-  booking link are Labi's real details, used as stand-in filler at the client's
-  request. They are live and they reach Labi, not KIRU. Swap them before this
+  embedded Setmore booking page are Labi's real details, used as stand-in
+  filler at the client's request. They are live and they reach Labi, not KIRU. Swap them before this
   goes anywhere near a real audience.
 
   Every value here was measured off the live ISU site (its source HTML, its
@@ -69,6 +69,9 @@
   --paper: #fcfcfc;   /* sampled from ISU's body background */
   --ink: #000;
   --grey: #888;       /* ISU's nav wipe + mobile menu ground */
+  --ease1: cubic-bezier(.37, 1.12, .51, .9);
+  --ease2: cubic-bezier(.19, 1, .22, 1);
+
   --display: 'Bebas Neue', 'Arial Narrow', Arial, sans-serif;
   --text: 'Abel', Arial, sans-serif;
 }
@@ -135,24 +138,18 @@ a { color: inherit; text-decoration: none; }
 /* --------------------------------------------------------------- #home ---- */
 
 #home .figure {
-  width: min(52vw, 46rem);
-  aspect-ratio: 3 / 2;
-  max-height: 64svh;
+  position: relative;
+  height: min(66svh, 40rem);
+  aspect-ratio: 1440 / 1920;   /* the photograph's own ratio - nothing is cropped */
+  width: auto;
   margin: 0 auto;
   overflow: hidden;
 }
 #home .figure img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  /*
-    The window is pushed down, not centred. Source is 1440x1920 (3:4); a 3:2
-    frame keeps about half its height. Centred, the crop would cut the hairline
-    off the top and the chin off the bottom. At 25% the visible window maps to
-    source y 240-1200, and the head runs 290-1200 - the whole face, losing only
-    the lower shoulders, which is the part doing the least work.
-  */
-  object-position: 50% 25%;
+  object-fit: cover;   /* frame matches the source ratio, so this crops nothing */
+  object-position: 50% 50%;
   display: block;
 }
 
@@ -393,7 +390,7 @@ a { color: inherit; text-decoration: none; }
 
 /* ---------------------------------------------------------------- mobile -- */
 
-@media (max-width: 900px) {
+@media (max-width: 759px) {
   #ico-nav { display: block; }
   #main-navigation { display: none; }
 
@@ -407,9 +404,9 @@ a { color: inherit; text-decoration: none; }
   }
 
   /* The photo runs full-bleed at its natural ratio, as ISU's does. */
-  /* Full bleed at the photo's own 3:4 - no crop at all on a phone. */
-  #home .figure { width: 100%; aspect-ratio: auto; max-height: none; }
-  #home .figure img { height: auto; object-fit: fill; object-position: 50% 50%; }
+  /* Full bleed at the photo's own 3:4 - no crop at all on a phone either. */
+  #home .figure { width: 100%; height: auto; aspect-ratio: auto; }
+  #home .figure img { height: auto; object-fit: fill; }
 
   #intro .content { width: 80%; }
 
@@ -434,4 +431,180 @@ a { color: inherit; text-decoration: none; }
   #main-footer { position: static; margin-top: 50px; }
 
   .preview-flag { bottom: 8px; right: 8px; }
+}
+
+/* ==========================================================================
+   MOTION
+   ==========================================================================
+
+   The reveal is ISU's, mechanism and timing both. Their intro does not fade
+   anything in: it lays #fcfcfc covers ("tapa") over the logo and the hero and
+   then scales those covers to zero from the right, so the artwork is uncovered
+   left to right. Straight from their js/app/Ui.js showHeader():
+
+     .tapa-line   1.15s  scaleX 1 -> 0, origin right, ease2, at t+0
+     .tapa-isu    0.85s  scaleX 1 -> 0, origin right, ease2, at t+0.70
+     .tapa-trazo  0.85s  scaleX 1 -> 0, origin right, ease2, at t+1.00
+     h2 .cov      0.65s  scaleX 1 -> 0, origin right, ease1, at t+1.60
+
+   The KIRU lockup is a single image where ISU's is four layered pieces, so the
+   covers here are positioned over its four ink regions, measured off the actual
+   file: wordmark y 5-91 / x 10-324, rule y 128-133, tagline and kanji sharing
+   y 171-357 but separated horizontally at about x 600 of 880.
+   ========================================================================== */
+
+.tapa {
+  position: absolute;
+  background: var(--paper);
+  transform: scaleX(1);
+  transform-origin: right center;
+  pointer-events: none;
+  z-index: 5;
+}
+.head__mark { position: relative; }
+
+/* Measured regions of the 880x363 lockup, as percentages. */
+.tapa--word  { left: 0;    top: 0;   width: 43%;  height: 31%; }
+.tapa--line  { left: 0;    top: 31%; width: 101%; height: 9%; }
+.tapa--tag   { left: 27%;  top: 40%; width: 42%;  height: 32%; }
+.tapa--kanji { left: 67%;  top: 40%; width: 35%;  height: 61%; }
+
+/* The hero carries one cover, as ISU's #home figure .tapa does. */
+#home .figure .tapa { left: 0; top: 0; width: 101%; height: 101%; }
+
+/* Nothing is uncovered until the script says so, but only when the script is
+   actually running - no JS means no covers, so the page is simply there. */
+.js .tapa { transition: transform 1.15s var(--ease2); }
+.js .is-revealed .tapa,
+.js .tapa.is-revealed { transform: scaleX(0); }
+
+.js .head .tapa--word  { transition-duration: 0.85s; transition-delay: 0.70s; }
+.js .head .tapa--line  { transition-duration: 1.15s; transition-delay: 0s; }
+.js .head .tapa--kanji { transition-duration: 0.85s; transition-delay: 1.00s; }
+.js .head .tapa--tag   { transition-duration: 0.65s; transition-delay: 1.60s;
+                         transition-timing-function: var(--ease1); }
+#home .figure .tapa    { transition-duration: 1.15s; transition-delay: 0.35s; }
+
+/* The nav arrives last, on ease1 like ISU's final beat. */
+.js #main-navigation { opacity: 0; transform: translateY(6px); }
+.js #main-navigation {
+  transition: opacity 0.65s var(--ease1) 1.75s, transform 0.65s var(--ease1) 1.75s;
+}
+.js .is-revealed #main-navigation { opacity: 1; transform: none; }
+
+/* --------------------------------------------------------- the curtain --- */
+
+/*
+   ISU's page transition, from Ui.js showPreload():
+     .bck   0.85s scaleX 0 -> 1, origin left   (sweeps in)
+     wrap   0.65s scaleX 1 -> 0, origin right, at +0.90  (sweeps away)
+
+   Kept for the first paint. For a nav click the same move runs compressed, so
+   it reads as the reference site's transition without making the visitor wait
+   1.5s for a section that is already in the document.
+*/
+#curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  pointer-events: none;
+  transform: scaleX(1);
+  transform-origin: right center;
+}
+#curtain .bck {
+  position: absolute;
+  inset: 0;
+  background: var(--paper);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+#curtain.sweep-in .bck {
+  transform: scaleX(1);
+  transition: transform 0.32s var(--ease2);
+}
+#curtain.sweep-out {
+  transform: scaleX(0);
+  transition: transform 0.36s cubic-bezier(.25, .46, .45, .94);
+}
+#curtain.idle { display: none; }
+
+/* ------------------------------------------------------- motion blur ----- */
+
+/*
+   ISU's stylesheet carries `#page { transition: all 600ms ease-in }` with
+   `#page.blured { filter: blur(20px) }`. 20px is a full defocus; this uses a
+   much smaller value so it reads as motion on the swap rather than as a
+   focus-pull, and it is only ever on for the length of the transition.
+*/
+.js #main-content { transition: filter 0.3s var(--ease2), opacity 0.3s var(--ease2); }
+.js #main-content.is-shifting { filter: blur(5px); opacity: 0; }
+
+/* ------------------------------------------------------------- grain ----- */
+
+/*
+   A little tooth on the hero so a flat greyscale photograph does not read as
+   plastic on a bright screen. feTurbulence rendered once into a data URI,
+   tiled at a fixed pixel size so it never scales with zoom or DPR, and kept
+   under the image's own contrast at 4%.
+*/
+#home .figure::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0.055;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
+}
+
+/* ------------------------------------------------- reduced motion -------- */
+
+/*
+   Everything above is decoration over content that is already in the document,
+   so switching it off leaves a complete page rather than a broken one.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .js .tapa,
+  .js #main-navigation,
+  .js #main-content,
+  #curtain,
+  #curtain .bck { transition: none !important; }
+  .js .tapa { transform: scaleX(0); }
+  .js #main-navigation { opacity: 1; transform: none; }
+  .js #main-content.is-shifting { filter: none; opacity: 1; }
+  #curtain { display: none; }
+}
+
+/* ------------------------------------------------------------- booking --- */
+
+/*
+  The embedded Setmore frame. Given a generous fixed height rather than being
+  asked to auto-size: it is cross-origin, so its content height cannot be read
+  and there is no way to fit it to its own content without Setmore posting a
+  message out. 820px clears the service list and the calendar step on desktop.
+*/
+.booking {
+  width: min(560px, 100%);
+  margin: 0 auto;
+}
+.booking__frame {
+  display: block;
+  width: 100%;
+  height: 820px;
+  border: 0;
+}
+.reserve-fallback {
+  margin: 18px auto 0;
+  text-align: center;
+  font-family: var(--text);
+  font-size: 16px;
+  line-height: 19px;
+}
+.reserve-fallback a { text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 759px) {
+  .booking { width: 100%; }
+  .booking__frame { height: 760px; }
 }

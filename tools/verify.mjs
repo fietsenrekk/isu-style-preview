@@ -81,7 +81,7 @@ async function load(url, w, h, mobile) {
   await send('Page.navigate', { url });
   await new Promise((r) => setTimeout(r, 1200));
   await ev('document.fonts.ready');
-  await new Promise((r) => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, 900));
 }
 async function shot(name) {
   const { data } = await send('Page.captureScreenshot', { format: 'png' });
@@ -106,7 +106,7 @@ if (badNow().length) fail.push(`desktop HTTP>=400: ${badNow().join(' | ')}`);
 
 for (const sec of SECTIONS) {
   await ev(`document.querySelector('#main-navigation [data-sec="${sec}"], .head__mark[data-sec="${sec}"]').click()`);
-  await new Promise((r) => setTimeout(r, 350));
+  await new Promise((r) => setTimeout(r, 900));
   await shot(`d-${sec}.png`);
   const s = await ev(`(() => { const s = document.getElementById('${sec}');
     const r = s.getBoundingClientRect();
@@ -140,7 +140,7 @@ if (fail.length === 0) ok.push(`typography matches reference (Bebas 22px, ${type
 const clipped = [];
 for (const sec of ['intro', 'prices', 'contact']) {
   await ev(`document.querySelector('#main-navigation [data-sec="${sec}"]').click()`);
-  await new Promise((r) => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, 900));
   /*
     .legend is exempt on purpose. It is set `white-space: nowrap` and is meant
     to run past its 500px column, exactly as ISU's does, so scrollWidth always
@@ -162,7 +162,7 @@ else ok.push('no clipped text in any desktop section');
 for (const w of [1440, 901]) {
   await load(BASE + '/', w, 900, false);
   await ev(`document.querySelector('#main-navigation [data-sec="prices"]').click()`);
-  await new Promise((r) => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, 900));
   const bounds = await ev(`(() => { const l = document.querySelector('#prices .legend');
     const r = l.getBoundingClientRect();
     return { right: Math.round(r.right), vw: document.documentElement.clientWidth,
@@ -183,12 +183,16 @@ await load(BASE + '/reservation.html', 1440, 900, false);
 if (errorsNow().length) fail.push(`reservation console: ${errorsNow().join(' | ')}`);
 if (badNow().length) fail.push(`reservation HTTP>=400: ${badNow().join(' | ')}`);
 await shot('d-reservation.png');
-const res = await ev(`(() => { const c = document.querySelector('.reserve-cta');
-  return { href: c.href, text: c.textContent.trim(),
+const res = await ev(`(() => { const f = document.querySelector('.booking__frame');
+  const fb = document.querySelector('.reserve-fallback a');
+  return { src: f ? f.src : null, h: f ? Math.round(f.getBoundingClientRect().height) : 0,
+    fallback: fb ? fb.href : null,
     overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth }; })()`);
-if (!res.href.includes('labibookings.setmore.com')) fail.push(`reservation CTA points at ${res.href}`);
-if (res.overflow) fail.push('reservation page overflows horizontally');
-else ok.push(`reservation page renders, CTA -> Setmore`);
+if (!res.src || !res.src.includes('labibookings.setmore.com')) fail.push('booking iframe missing or wrong src: ' + res.src);
+else if (res.h < 400) fail.push('booking iframe only ' + res.h + 'px tall');
+else if (!res.fallback || !res.fallback.includes('setmore.com')) fail.push('no direct-link fallback for the booking frame');
+else if (res.overflow) fail.push('reservation page overflows horizontally');
+else ok.push('booking iframe embedded (' + res.h + 'px) with a direct-link fallback');
 
 /* --------------------------------------------------------------- mobile --- */
 
@@ -200,7 +204,7 @@ for (const sec of SECTIONS) {
     if (!n.classList.contains('open')) document.getElementById('ico-nav').click(); })()`);
   await new Promise((r) => setTimeout(r, 250));
   await ev(`document.querySelector('#main-navigation-mobile [data-sec="${sec}"]').click()`);
-  await new Promise((r) => setTimeout(r, 350));
+  await new Promise((r) => setTimeout(r, 900));
   await shot(`m-${sec}.png`);
   const s = await ev(`(() => { const s = document.getElementById('${sec}');
     const r = s.getBoundingClientRect();

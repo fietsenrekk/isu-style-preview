@@ -34,7 +34,12 @@ shown anywhere it could be mistaken for KIRU's real contact information.
   WebP at 480/720/1080/1440 with a JPEG fallback.
 - **Fonts** — Bebas Neue and Abel, both OFL, self-hosted WOFF2. Licences ship
   alongside them in `assets/fonts/`.
-- **Zero third-party requests.** No CDN, no analytics, no cookies.
+- **Third-party requests: one page only.** `index.html` loads nothing
+  off-site — no CDN, no analytics, no cookies. `reservation.html` embeds the
+  live Setmore booking page in an iframe, which brings Setmore's own scripts
+  and cookie notice with it, inside the frame. That is the price of booking
+  without sending the visitor to another tab; see the note at the top of that
+  file.
 
 ## Local preview
 
