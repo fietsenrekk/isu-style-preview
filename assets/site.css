@@ -1,16 +1,24 @@
 /*
-  LABI — ISU-STYLE PREVIEW
+  KIRU — ISU-STYLE PREVIEW
   ========================
 
   A pitch mockup reproducing the page composition and interaction model of
-  isu-antwerp.com with Labi's own wordmark, photograph and business data.
+  isu-antwerp.com with the KIRU lockup and a portrait from joruhairstudio.
+
+  NOTE ON CONTENT: the address, phone, email, Instagram, opening hours and
+  booking link are Labi's real details, used as stand-in filler at the client's
+  request. They are live and they reach Labi, not KIRU. Swap them before this
+  goes anywhere near a real audience.
 
   Every value here was measured off the live ISU site (its source HTML, its
   css/style.css, and computed styles read in the browser) on 2026-08-17 —
   none of it is eyeballed:
 
-    header        absolute, top 50px / right 100px, max-width 145px, right-aligned
-    tagline       Bebas Neue 22px, and hidden entirely on mobile
+    header        absolute, top 50px / right 100px, right-aligned. The slot is
+                  wider than ISU's 145px because the KIRU lockup carries the
+                  wordmark, rule, tagline and kanji in one image, where ISU
+                  splits the mark and the tagline into separate elements
+    home figure   3:2 rather than ISU's 634/358 - see the note at #home .figure
     nav           absolute, bottom 80px / left 100px, Bebas Neue 22px;
                   li margin-bottom 6px, line-height 20px, float + clear;
                   ::before wipe in #888 driven by data-text, .35s ease-in
@@ -103,18 +111,13 @@ a { color: inherit; text-decoration: none; }
   position: absolute;
   top: 50px;
   right: 100px;
-  max-width: 145px;
+  max-width: 300px;
   text-align: right;
   z-index: 900;
 }
-.head__mark { display: block; margin: 0 0 25px 0; }
-.head__mark svg { width: 100%; height: auto; display: block; color: var(--ink); }
-.head__rule { display: block; height: 3px; background: var(--ink); margin-top: 6px; }
-.head__tagline {
-  font-family: var(--display);
-  font-size: 22px;
-  line-height: 1;
-}
+.head__title { margin: 0; font-size: inherit; font-weight: inherit; line-height: 0; }
+.head__mark { display: block; }
+.head__mark img { width: 100%; height: auto; display: block; }
 
 /* ------------------------------------------------------------------ main -- */
 
@@ -132,8 +135,9 @@ a { color: inherit; text-decoration: none; }
 /* --------------------------------------------------------------- #home ---- */
 
 #home .figure {
-  width: min(60vw, 68rem);
-  aspect-ratio: 634 / 358;   /* ISU's own measured embed ratio */
+  width: min(52vw, 46rem);
+  aspect-ratio: 3 / 2;
+  max-height: 64svh;
   margin: 0 auto;
   overflow: hidden;
 }
@@ -142,13 +146,13 @@ a { color: inherit; text-decoration: none; }
   height: 100%;
   object-fit: cover;
   /*
-    Biased up from centre. The source is 709x945 (3:4) and the desktop frame is
-    ~1.77:1, so covering it drops roughly 58% of the photo's height. Centred,
-    the crop cut through the forearm and lost the clippers and the hairline;
-    shifted up it keeps the hand, the clippers and the fade, and trims the lower
-    torso instead — the part of the frame doing the least work.
+    The window is pushed down, not centred. Source is 1440x1920 (3:4); a 3:2
+    frame keeps about half its height. Centred, the crop would cut the hairline
+    off the top and the chin off the bottom. At 25% the visible window maps to
+    source y 240-1200, and the head runs 290-1200 - the whole face, losing only
+    the lower shoulders, which is the part doing the least work.
   */
-  object-position: 50% 28%;
+  object-position: 50% 25%;
   display: block;
 }
 
@@ -394,9 +398,7 @@ a { color: inherit; text-decoration: none; }
   #main-navigation { display: none; }
 
   /* ISU hides the tagline entirely on mobile — only the mark remains. */
-  .head { top: 40px; right: 7.5%; max-width: 120px; }
-  .head__tagline { display: none; }
-  .head__mark { margin-bottom: 0; }
+  .head { top: 34px; right: 7.5%; max-width: 46vw; }
 
   #main-content {
     min-height: 0;
@@ -405,7 +407,8 @@ a { color: inherit; text-decoration: none; }
   }
 
   /* The photo runs full-bleed at its natural ratio, as ISU's does. */
-  #home .figure { width: 100%; aspect-ratio: auto; }
+  /* Full bleed at the photo's own 3:4 - no crop at all on a phone. */
+  #home .figure { width: 100%; aspect-ratio: auto; max-height: none; }
   #home .figure img { height: auto; object-fit: fill; object-position: 50% 50%; }
 
   #intro .content { width: 80%; }

@@ -207,11 +207,11 @@ for (const sec of SECTIONS) {
     return { active: s.classList.contains('is-active'), h: Math.round(r.height),
       overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
       menuClosed: !document.getElementById('main-navigation-mobile').classList.contains('open'),
-      taglineHidden: getComputedStyle(document.querySelector('.head__tagline')).display === 'none' }; })()`);
+      logoW: Math.round(document.querySelector('.head__mark img').getBoundingClientRect().width) }; })()`);
   if (!s.active) fail.push(`mobile: #${sec} did not activate`);
   else if (s.overflow) fail.push(`mobile: #${sec} causes horizontal overflow`);
   else if (!s.menuClosed) fail.push(`mobile: menu stayed open after choosing ${sec}`);
-  else if (!s.taglineHidden) fail.push('mobile: tagline should be hidden (ISU hides it)');
+  else if (s.logoW < 90) fail.push('mobile: logo is only ' + s.logoW + 'px wide - the lockup sub-line will not read');
   else ok.push(`mobile #${sec} renders (${s.h}px), menu closes, no overflow`);
 }
 
