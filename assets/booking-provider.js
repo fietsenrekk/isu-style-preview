@@ -121,12 +121,18 @@ window.BookingProvider = (function () {
   }
 
   function compose(b) {
-    var lines = [
-      'Appointment request via the website.',
-      '',
-      'Service   : ' + b.serviceName + ' (' + b.serviceNl + ')',
-      'Price     : ' + b.price + ' euro',
-      'Duration  : ' + b.minutes + ' minutes',
+    var lines = ['Appointment request via the website.', ''];
+
+    /* One line per service, with its own price and length, so the salon can
+       see what was actually booked rather than a single concatenated string
+       they have to unpick. */
+    b.services.forEach(function (s, i) {
+      lines.push((i === 0 ? 'Services  : ' : '            ')
+        + s.name + ' (' + s.nl + ') — ' + s.price + ' euro, ' + s.minutes + ' min');
+    });
+
+    lines.push(
+      'Total     : ' + b.price + ' euro, ' + b.minutes + ' minutes',
       'Stylist   : ' + b.staffName,
       'Date      : ' + b.dateLabel + ' (' + isoDate(b.date) + ')',
       'Time      : ' + b.time,
@@ -134,7 +140,7 @@ window.BookingProvider = (function () {
       'Name      : ' + b.name,
       'E-mail    : ' + b.email,
       'Phone     : ' + b.phone
-    ];
+    );
     if (b.notes) lines.push('', 'Notes     : ' + b.notes);
     return lines.join('\n');
   }

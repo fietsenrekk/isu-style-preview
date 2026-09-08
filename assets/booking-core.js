@@ -93,6 +93,70 @@
     });
   }
 
+  /* --------------------------------------------------- sets of services --- */
+
+  /*
+    A booking is a set, not one item: a cut and a colour and a wash are one
+    visit. Everything below takes an array of service ids, and every one of them
+    is defined so that the empty set means "nothing chosen yet, nothing ruled
+    out" rather than "nothing is possible".
+  */
+
+  function servicesIn(shop, ids) {
+    return (ids || []).map(function (id) { return service(shop, id); })
+                      .filter(Boolean);
+  }
+
+  /*
+    Two services clash when they share a group, because a group holds
+    alternatives to one another - the four ways to book a cut, the five colour
+    processes. Booking two of those together would sell the same appointment
+    twice. Services in different groups combine freely.
+  */
+  function clashes(shop, ids, candidateId) {
+    var c = service(shop, candidateId);
+    if (!c) return false;
+    return servicesIn(shop, ids).some(function (s) {
+      return s.id !== c.id && s.group === c.group;
+    });
+  }
+
+  /* Can this stylist do EVERY service in the set? */
+  function canDoAll(shop, staffId, ids) {
+    if (!staffId) return true;
+    return servicesIn(shop, ids).every(function (s) {
+      return s.staff.indexOf(staffId) !== -1;
+    });
+  }
+
+  /* Stylists able to take the whole set. Empty set => everyone. */
+  function staffForSet(shop, ids) {
+    return shop.staff.filter(function (p) { return canDoAll(shop, p.id, ids); });
+  }
+
+  /* Whether the set can be extended by this service, ignoring who does it. */
+  function canAdd(shop, ids, candidateId) {
+    if ((ids || []).indexOf(candidateId) !== -1) return true;   // already in: removable
+    return !clashes(shop, ids, candidateId);
+  }
+
+  function totalMinutes(shop, ids) {
+    return servicesIn(shop, ids).reduce(function (n, s) { return n + s.minutes; }, 0);
+  }
+
+  /*
+    One "from" anywhere in the set makes the whole total a floor. Adding a
+    fixed 45 to a "from 160" cannot produce a fixed 205 - the balayage half can
+    still move, so the sum can only be quoted as a minimum.
+  */
+  function totalPriceLabel(shop, ids) {
+    var set = servicesIn(shop, ids);
+    if (!set.length) return '';
+    var sum = set.reduce(function (n, s) { return n + s.price; }, 0);
+    var floor = set.some(function (s) { return s.from; });
+    return (floor ? 'from ' : '') + money(sum);
+  }
+
   /* ------------------------------------------------------------- days ----- */
 
   function isOpenOn(shop, date) {
@@ -202,6 +266,34 @@
     });
   }
 
+  /*
+    The same seven rows, with consecutive days that share a value collapsed into
+    one range: five identical weekday lines become "MON — FRI  10:00-22:00".
+    Five rows saying the same thing is five chances to read the same fact, which
+    is four more than anyone needs.
+
+    Collapsing is computed from the values rather than hard-coded to Mon-Fri, so
+    if the shop ever opens on a Saturday, or closes on a Wednesday, the summary
+    re-splits itself correctly instead of quietly lying.
+  */
+  function hoursSummary(shop) {
+    var rows = hoursRows(shop);
+    var runs = [], current = null;
+    rows.forEach(function (r) {
+      if (current && current.value === r.value) { current.end = r; return; }
+      if (current) runs.push(current);
+      current = { start: r, end: r, value: r.value, open: r.open };
+    });
+    if (current) runs.push(current);
+    return runs.map(function (g) {
+      return {
+        label: g.start === g.end ? g.start.label : g.start.label + ' — ' + g.end.label,
+        value: g.value,
+        open: g.open
+      };
+    });
+  }
+
   function breakLabel(shop) {
     var b = shop.hours.break;
     if (!b || !b.start || !b.end) return '';
@@ -218,6 +310,14 @@
     canDo: canDo,
     servicesFor: servicesFor,
     staffFor: staffFor,
+    servicesIn: servicesIn,
+    clashes: clashes,
+    canDoAll: canDoAll,
+    staffForSet: staffForSet,
+    canAdd: canAdd,
+    totalMinutes: totalMinutes,
+    totalPriceLabel: totalPriceLabel,
+    hoursSummary: hoursSummary,
     isOpenOn: isOpenOn,
     sameDay: sameDay,
     addDays: addDays,

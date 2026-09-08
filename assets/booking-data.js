@@ -30,10 +30,23 @@
   HOURS are the owner's: Monday to Friday 10:00-22:00, closed Saturday and
   Sunday, with a one-hour rest break in the middle of the day.
 
-  STAFF: Labi and Donovan. The owner's instruction was that "Labi does
-  everything on the list except highlights, balayage and toner", so those four
-  line items (half-head and full-head highlights are two entries of the one
-  "highlights" exclusion) are Donovan-only. Every other service is done by both.
+  STAFF: Labi and Donovan. Labi cuts, Donovan colours. Every colour service —
+  both highlights, balayage, toner, and both regrowth services — is Donovan's.
+  Labi does the cuts, the washes and the blow-dries. That is the whole split,
+  and it is expressed once, on each service's `staff` list.
+
+  COMBINATIONS. Services can be booked together. What cannot be combined is
+  expressed by `group`: two services sharing a group are alternatives to one
+  another and are mutually exclusive, services in different groups combine
+  freely. So a cut and a colour and a wash go together, but a women's cut and a
+  women's cut with a blow-dry do not — they are the same appointment priced two
+  ways, and offering both at once would sell the cut twice.
+
+      cut     the four cutting options
+      colour  the five colour services — one colour process per visit
+      wash    wash, or wash with a blow-dry
+      toner   on its own, because a toner is a finishing step that genuinely
+              sits on top of any of the above
 
   ---------------------------------------------------------------------------
   ASSUMPTIONS — these were NOT supplied and are guesses. Change them freely.
@@ -117,6 +130,7 @@ window.SHOP = {
       name: "Men's cut",
       nl: 'Heren knippen',
       price: 45, from: true, minutes: 30,
+      group: 'cut',
       staff: ['labi', 'donovan']
     },
     {
@@ -124,6 +138,7 @@ window.SHOP = {
       name: "Women's cut",
       nl: 'Dames knippen',
       price: 45, from: false, minutes: 45,
+      group: 'cut',
       staff: ['labi', 'donovan']
     },
     {
@@ -131,6 +146,7 @@ window.SHOP = {
       name: "Women's cut + dry",
       nl: 'Dames knippen drogen',
       price: 55, from: false, minutes: 60,
+      group: 'cut',
       staff: ['labi', 'donovan']
     },
     {
@@ -138,15 +154,17 @@ window.SHOP = {
       name: "Women's cut + blow-dry",
       nl: 'Dames knippen blowdry',
       price: 65, from: false, minutes: 60,
+      group: 'cut',
       staff: ['labi', 'donovan']
     },
 
-    /* --- the four Donovan-only entries ----------------------------------- */
+    /* --- colour: Donovan's, all of it ------------------------------------ */
     {
       id: 'half-head-highlights',
       name: 'Half-head highlights',
       nl: 'Half head highlights',
       price: 70, from: false, minutes: 90,
+      group: 'colour',
       staff: ['donovan']
     },
     {
@@ -154,6 +172,7 @@ window.SHOP = {
       name: 'Full-head highlights',
       nl: 'Fullhead highlights',
       price: 100, from: false, minutes: 120,
+      group: 'colour',
       staff: ['donovan']
     },
     {
@@ -161,6 +180,7 @@ window.SHOP = {
       name: 'Balayage',
       nl: 'Balayage',
       price: 160, from: true, minutes: 180,
+      group: 'colour',
       staff: ['donovan']
     },
     {
@@ -168,29 +188,31 @@ window.SHOP = {
       name: 'Toner',
       nl: 'Toner',
       price: 45, from: true, minutes: 45,
+      group: 'toner',
       staff: ['donovan']
     },
-    /* --------------------------------------------------------------------- */
-
     {
       id: 'uitgroei',
       name: 'Regrowth colour',
       nl: 'Uitgroei',
       price: 50, from: false, minutes: 90,
-      staff: ['labi', 'donovan']
+      group: 'colour',
+      staff: ['donovan']
     },
     {
       id: 'uitgroei-lengtes',
       name: 'Regrowth + ends and lengths',
       nl: 'Uitgroei + punten en lengtes',
       price: 70, from: false, minutes: 120,
-      staff: ['labi', 'donovan']
+      group: 'colour',
+      staff: ['donovan']
     },
     {
       id: 'wassen',
       name: 'Wash',
       nl: 'Wassen',
       price: 7.5, from: false, minutes: 15,
+      group: 'wash',
       staff: ['labi', 'donovan']
     },
     {
@@ -198,6 +220,7 @@ window.SHOP = {
       name: 'Wash + blow-dry',
       nl: 'Wassen blowdry',
       price: 40, from: true, minutes: 45,
+      group: 'wash',
       staff: ['labi', 'donovan']
     }
   ]

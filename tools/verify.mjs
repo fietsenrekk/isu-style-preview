@@ -189,17 +189,25 @@ const hours = await evaluate(`(() => {
   const rows = [...document.querySelectorAll('#hours-rows .item')].map(i => [
     i.querySelector('.desc').textContent.trim(), i.querySelector('.value').textContent.trim()]);
   return { rows, brk: document.getElementById('hours-break').textContent.trim(),
-           fromData: BookingCore.hoursRows(SHOP).map(r => [r.label, r.value]) };
+           fromData: BookingCore.hoursSummary(SHOP).map(r => [r.label, r.value]) };
 })()`);
 check(JSON.stringify(hours.rows) === JSON.stringify(hours.fromData),
   'published hours are rendered from booking-data, and match it',
   'published hours differ from booking-data:\n     page ' + JSON.stringify(hours.rows)
   + '\n     data ' + JSON.stringify(hours.fromData));
-check(JSON.stringify(hours.rows.slice(0, 5).map(r => r[1]))
-      === JSON.stringify(Array(5).fill('10:00-22:00')),
-  'Monday to Friday read 10:00-22:00', 'weekday hours are ' + JSON.stringify(hours.rows));
-check(hours.rows[5][1] === '/' && hours.rows[6][1] === '/',
-  'Saturday and Sunday are closed', 'weekend is not closed: ' + JSON.stringify(hours.rows.slice(5)));
+check(hours.rows.length === 2,
+  'the hours are stated in two lines, not seven',
+  'expected 2 collapsed rows, got ' + hours.rows.length + ': ' + JSON.stringify(hours.rows));
+check(JSON.stringify(hours.rows[0]) === JSON.stringify(['MON — FRI', '10:00-22:00']),
+  'Monday to Friday is one row reading 10:00-22:00',
+  'weekday row is ' + JSON.stringify(hours.rows[0]));
+check(JSON.stringify(hours.rows[1]) === JSON.stringify(['SAT — SUN', '/']),
+  'Saturday and Sunday are one closed row',
+  'weekend row is ' + JSON.stringify(hours.rows[1]));
+check(!/10:00-22:00[\s\S]*10:00-22:00/.test(
+        await evaluate('document.getElementById("hours-rows").innerText')),
+  'the opening time is printed once, not five times',
+  '10:00-22:00 appears more than once in the hours block');
 check(/14:00-15:00/.test(hours.brk), 'the afternoon break is published (' + hours.brk + ')',
   'break not shown: ' + hours.brk);
 
@@ -289,7 +297,8 @@ check(prices.rows.some(r => r[1] === '7.50'), 'the 7.50 wash keeps its cents',
   'wash price is ' + JSON.stringify(prices.rows.find(r => /Wash$/.test(r[0]))));
 
 /* --- the exclusion, both directions, in the live DOM ------------------- */
-const DONOVAN_ONLY = ['half-head-highlights', 'full-head-highlights', 'balayage', 'toner'];
+const DONOVAN_ONLY = ['half-head-highlights', 'full-head-highlights', 'balayage',
+                      'toner', 'uitgroei', 'uitgroei-lengtes'];
 
 /* Direction 1: choose Labi, the four colour services must go dead. */
 await click('.step[data-step="1"] .item--pick:nth-of-type(1)');
@@ -304,11 +313,11 @@ const afterLabi = await evaluate(`(() => {
 })()`);
 check(afterLabi.picked === 'LABI', 'LABI can be selected', 'LABI did not select');
 check(DONOVAN_ONLY.every(id => afterLabi.services[id].off && afterLabi.services[id].disabled),
-  'choosing LABI disables highlights, balayage and toner',
+  'choosing LABI disables all six colour services',
   'exclusion failed: ' + JSON.stringify(DONOVAN_ONLY.map(id => [id, afterLabi.services[id]])));
 check(Object.entries(afterLabi.services)
   .filter(([id]) => !DONOVAN_ONLY.includes(id)).every(([, v]) => !v.off),
-  'choosing LABI leaves her other 8 services selectable',
+  'choosing LABI leaves her other 6 services selectable',
   'too much was disabled: ' + JSON.stringify(afterLabi.services));
 await shot('d-booking-labi');
 
@@ -339,6 +348,56 @@ check(!afterBalayage.donovanOff, 'DONOVAN stays available for balayage',
 check(afterBalayage.donovanPicked,
   'the only stylist who can do it is selected automatically',
   'DONOVAN was not auto-selected for a Donovan-only service');
+
+/* --- several services in one booking ----------------------------------- */
+
+/*
+  With balayage already chosen (Donovan, 180 min), add a women's cut. They are
+  in different groups so they combine; both are Donovan's so he stays valid.
+*/
+const cutIdx = await evaluate(`SHOP.services.findIndex(s => s.id === 'dames-knippen')`);
+await click(`.step[data-step="2"] .item--pick:nth-of-type(${cutIdx + 1})`);
+const multi = await evaluate(`(() => {
+  const picked = [...document.querySelectorAll('.step[data-step="2"] .is-picked')]
+    .map(b => b.querySelector('.desc').textContent.trim());
+  const off = [...document.querySelectorAll('.step[data-step="2"] .item--pick')]
+    .filter(b => b.classList.contains('is-off'))
+    .map(b => b.querySelector('.desc').textContent.trim());
+  return { picked, off, total: document.getElementById('svc-total').textContent.trim(),
+    times: [...document.querySelectorAll('.step[data-step="4"] .chip--time')].length };
+})()`);
+check(multi.picked.length === 2 && multi.picked.includes('Balayage')
+      && multi.picked.includes("Women's cut"),
+  'a cut and a colour can be booked together',
+  'selection is ' + JSON.stringify(multi.picked));
+check(multi.off.includes("Women's cut + dry") && multi.off.includes("Women's cut + blow-dry")
+      && multi.off.includes("Men's cut"),
+  'the other three cuts go dead — a cut is a cut, not three',
+  'other cuts were not excluded: ' + JSON.stringify(multi.off));
+check(multi.off.includes('Full-head highlights') && multi.off.includes('Regrowth colour'),
+  'the other colour processes go dead too — one colour per visit',
+  'other colour services were not excluded: ' + JSON.stringify(multi.off));
+check(!multi.off.includes('Wash') && !multi.off.includes('Toner'),
+  'a wash and a toner remain addable on top',
+  'wash or toner was wrongly excluded: ' + JSON.stringify(multi.off));
+/* 160 (from) + 45 = 205, and one floor price makes the total a floor. */
+check(/from 205/.test(multi.total) && /225 minutes/.test(multi.total),
+  'the running total sums the prices and the time (' + multi.total + ')',
+  'total reads: ' + multi.total);
+await shot('d-booking-multi');
+
+/* Removing the cut must restore what it excluded. */
+await click(`.step[data-step="2"] .item--pick:nth-of-type(${cutIdx + 1})`);
+const afterRemove = await evaluate(`(() => ({
+  picked: document.querySelectorAll('.step[data-step="2"] .is-picked').length,
+  cutsOff: [...document.querySelectorAll('.step[data-step="2"] .item--pick')]
+    .filter(b => b.classList.contains('is-off'))
+    .map(b => b.querySelector('.desc').textContent.trim())
+    .filter(t => /cut/i.test(t)).length
+}))()`);
+check(afterRemove.picked === 1 && afterRemove.cutsOff === 0,
+  'removing a service releases everything it was excluding',
+  'after removal: ' + JSON.stringify(afterRemove));
 
 /* --- days and times ---------------------------------------------------- */
 const step3 = await evaluate(`(() => {
@@ -456,11 +515,11 @@ check(mBooking.rows === 12, 'all 12 services are reachable on mobile',
   mBooking.rows + ' services on mobile');
 
 await click('.step[data-step="1"] .item--pick:nth-of-type(1)', 400);
-check(await evaluate(`document.querySelectorAll('.step[data-step="2"] .item--pick.is-off').length === 4`),
+check(await evaluate(`document.querySelectorAll('.step[data-step="2"] .item--pick.is-off').length === 6`),
   'the exclusion works on mobile as well',
   'mobile exclusion disabled '
   + await evaluate(`document.querySelectorAll('.step[data-step="2"] .item--pick.is-off').length`)
-  + ' services, expected 4');
+  + ' services, expected 6');
 await shot('m-booking');
 
 /* -------------------------------------------------------- no-script ----- */
@@ -475,8 +534,9 @@ const noJs = await evaluate.name && await (async () => {
   return result.value;
 })();
 const [rowCount, hasHours, hasPrice] = String(noJs).split('|');
-check(Number(rowCount) >= 19, 'without JavaScript the full price list and hours are still there ('
-  + rowCount + ' rows)', 'no-JS fallback is missing rows: ' + rowCount);
+check(Number(rowCount) === 14,
+  'without JavaScript all 12 prices and the 2 hours rows are still there',
+  'no-JS fallback has ' + rowCount + ' rows, expected 14');
 check(hasHours === 'true' && hasPrice === 'true',
   'the no-JavaScript page still states the hours and the prices',
   'no-JS fallback lost the hours or the prices');

@@ -504,6 +504,18 @@ a { color: inherit; text-decoration: none; }
 .item--pick.is-off:hover .desc,
 .item--pick.is-off:hover .value { color: #c9c9c9; }
 
+/* A running total under the service list, so the cost and the length of the
+   visit are visible while services are still being added rather than only at
+   the end. Empty until something is chosen, so it reserves no space. */
+.step__total {
+  margin: 16px auto 0;
+  text-align: center;
+  font-family: var(--display);
+  font-size: 20px;
+  line-height: 20px;
+}
+.step__total:empty { display: none; }
+
 /* ------------------------------------------------------- days and times -- */
 
 .strip, .grid {

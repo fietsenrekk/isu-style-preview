@@ -119,16 +119,25 @@ ok('tomorrow is unaffected by today\'s clock',
    Core.slotsFor(SHOP, new Date(2026, 8, 10), 30, now)[0] === '10:00');
 
 console.log('\nstaff <-> service exclusion');
-const donovanOnly = ['half-head-highlights', 'full-head-highlights', 'balayage', 'toner'];
+/* All colour work is Donovan's: both highlights, balayage, toner and both
+   regrowth services. Labi has the cuts, the washes and the blow-dries. */
+const donovanOnly = ['half-head-highlights', 'full-head-highlights', 'balayage',
+                     'toner', 'uitgroei', 'uitgroei-lengtes'];
 for (const id of donovanOnly) {
   ok('Labi cannot do ' + id, Core.canDo(SHOP, 'labi', id) === false);
   ok('Donovan can do ' + id, Core.canDo(SHOP, 'donovan', id) === true);
 }
-check('Labi offers 8 of the 12 services', Core.servicesFor(SHOP, 'labi').length, 8);
+check('Labi offers 6 of the 12 services', Core.servicesFor(SHOP, 'labi').length, 6);
+check('Labi has the cuts and the washes and nothing else',
+      Core.servicesFor(SHOP, 'labi').map(s => s.group).sort(),
+      ['cut', 'cut', 'cut', 'cut', 'wash', 'wash']);
 check('Donovan offers all 12', Core.servicesFor(SHOP, 'donovan').length, 12);
 check('no stylist chosen shows all 12', Core.servicesFor(SHOP, null).length, 12);
 check('balayage is Donovan only', Core.staffFor(SHOP, 'balayage').map(s => s.id), ['donovan']);
 check("men's cut is both", Core.staffFor(SHOP, 'heren-knippen').map(s => s.id), ['labi', 'donovan']);
+check('regrowth is Donovan only', Core.staffFor(SHOP, 'uitgroei').map(s => s.id), ['donovan']);
+check('regrowth + lengths is Donovan only',
+      Core.staffFor(SHOP, 'uitgroei-lengtes').map(s => s.id), ['donovan']);
 check('no service chosen shows both', Core.staffFor(SHOP, null).length, 2);
 ok('the two directions agree for every pair',
    SHOP.services.every(sv =>
@@ -192,6 +201,94 @@ ok('every service is doable by at least one stylist',
    SHOP.services.every(s => s.staff.length > 0));
 ok('every service duration fits inside a working day',
    SHOP.services.every(s => Core.slotsFor(SHOP, WED, s.minutes, null).length > 0));
+
+console.log('\ncombining services');
+/* Same group = alternatives to one another, different groups = combinable. */
+check('every service has a group', SHOP.services.every(s => !!s.group), true);
+ok('two cuts cannot be booked together',
+   Core.clashes(SHOP, ['dames-knippen'], 'dames-knippen-blowdry'));
+ok('two colour processes cannot be booked together',
+   Core.clashes(SHOP, ['balayage'], 'full-head-highlights'));
+ok('regrowth clashes with balayage — both are colour',
+   Core.clashes(SHOP, ['uitgroei'], 'balayage'));
+ok('two washes cannot be booked together',
+   Core.clashes(SHOP, ['wassen'], 'wassen-blowdry'));
+ok('a cut and a colour DO go together',
+   !Core.clashes(SHOP, ['dames-knippen'], 'balayage'));
+ok('a cut, a colour, a toner and a wash all go together',
+   !Core.clashes(SHOP, ['dames-knippen', 'balayage', 'toner'], 'wassen'));
+ok('a service never clashes with itself (so it stays removable)',
+   Core.canAdd(SHOP, ['balayage'], 'balayage'));
+ok('nothing clashes with an empty set',
+   SHOP.services.every(s => Core.canAdd(SHOP, [], s.id)));
+ok('clashing is symmetric', SHOP.services.every(a => SHOP.services.every(b =>
+   Core.clashes(SHOP, [a.id], b.id) === Core.clashes(SHOP, [b.id], a.id))));
+
+console.log('\nwho can take a whole set');
+check('a cut alone: both stylists', Core.staffForSet(SHOP, ['dames-knippen']).map(s => s.id),
+      ['labi', 'donovan']);
+check('cut + balayage: Donovan only',
+      Core.staffForSet(SHOP, ['dames-knippen', 'balayage']).map(s => s.id), ['donovan']);
+check('cut + wash: still both',
+      Core.staffForSet(SHOP, ['dames-knippen', 'wassen']).map(s => s.id), ['labi', 'donovan']);
+check('the empty set rules nobody out', Core.staffForSet(SHOP, []).length, 2);
+ok('every combinable set has at least one stylist who can take it',
+   SHOP.services.every(a => SHOP.services.every(b =>
+     Core.clashes(SHOP, [a.id], b.id) || Core.staffForSet(SHOP, [a.id, b.id]).length > 0)));
+ok('canDoAll agrees with staffForSet for every pair',
+   SHOP.services.every(a => SHOP.services.every(b => SHOP.staff.every(p =>
+     Core.canDoAll(SHOP, p.id, [a.id, b.id])
+       === Core.staffForSet(SHOP, [a.id, b.id]).some(x => x.id === p.id)))));
+
+console.log('\ntotals for a set');
+check('duration sums', Core.totalMinutes(SHOP, ['dames-knippen', 'wassen']), 60);
+check('an empty set is zero minutes', Core.totalMinutes(SHOP, []), 0);
+check('price sums', Core.totalPriceLabel(SHOP, ['dames-knippen', 'wassen']), '52.50');
+/* One floor price makes the whole total a floor: 160+ and 45 cannot add to a
+   fixed 205, because the balayage half can still move. */
+check('one "from" makes the total a "from"',
+      Core.totalPriceLabel(SHOP, ['balayage', 'dames-knippen']), 'from 205');
+check('all-fixed stays fixed',
+      Core.totalPriceLabel(SHOP, ['dames-knippen', 'full-head-highlights']), '145');
+check('an empty set has no price', Core.totalPriceLabel(SHOP, []), '');
+
+console.log('\nlong combinations still fit a day');
+/* The longest legal booking: one cut, one colour, a toner and a wash. */
+const longest = ['dames-knippen-blowdry', 'balayage', 'toner', 'wassen-blowdry'];
+ok('the longest legal combination is internally consistent',
+   longest.every((id, i) => !Core.clashes(SHOP, longest.slice(0, i), id)));
+const longMins = Core.totalMinutes(SHOP, longest);
+ok('the longest combination is ' + longMins + ' minutes', longMins > 0);
+ok('and it still has slots on a working day',
+   Core.slotsFor(SHOP, WED, longMins, null).length > 0,
+   'no slot fits ' + longMins + ' minutes');
+ok('every one of those slots clears the break and the close',
+   Core.slotsFor(SHOP, WED, longMins, null).every(t => {
+     const s = Core.parseHM(t);
+     return s + longMins <= 1320 && !(s < 900 && s + longMins > 840);
+   }));
+
+console.log('\nhours, collapsed');
+const sum = Core.hoursSummary(SHOP);
+check('five identical weekdays collapse to one row', sum.length, 2);
+check('the weekday row', [sum[0].label, sum[0].value], ['MON — FRI', '10:00-22:00']);
+check('the weekend row', [sum[1].label, sum[1].value], ['SAT — SUN', '/']);
+ok('the collapsed rows describe exactly the same week as the full ones', (() => {
+  const expand = [];
+  Core.hoursSummary(SHOP).forEach(g => {
+    const [a, b] = g.label.split(' — ');
+    const order = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+    const from = order.indexOf(a), to = b ? order.indexOf(b) : order.indexOf(a);
+    for (let i = from; i <= to; i++) expand.push([order[i], g.value]);
+  });
+  return JSON.stringify(expand) === JSON.stringify(rows.map(r => [r.label, r.value]));
+})());
+ok('a single open day would not be written as a range', (() => {
+  const one = JSON.parse(JSON.stringify({ hours: SHOP.hours, staff: [], services: [] }));
+  one.hours.openDays = [3];
+  const s = Core.hoursSummary(one);
+  return s.some(g => g.label === 'WED' && g.value === '10:00-22:00');
+})());
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
