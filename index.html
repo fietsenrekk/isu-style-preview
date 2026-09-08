@@ -3,21 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KIRU — preview</title>
-<meta name="description" content="KIRU — hair by night. A visual-direction preview.">
+<title>JILL SCUTT — preview</title>
+<meta name="description" content="JILL SCUTT — hair, Antwerp. A visual-direction preview.">
 <meta name="robots" content="noindex, nofollow">
 <!--
   PREVIEW / PITCH MOCKUP — not a live business site.
 
   Reproduces the page composition and interaction model of isu-antwerp.com with
-  the KIRU lockup and a portrait from joruhairstudio. Every measured value, and
-  the places this deliberately diverges from ISU's stylesheet, are documented at
-  the top of assets/site.css.
+  the JILL SCUTT wordmark. Every measured value, and the places this
+  deliberately diverges from ISU's stylesheet, are documented at the top of
+  assets/site.css.
 
   The contact details are Labi's real ones, used as stand-in filler by request.
-  They are live and they reach Labi, not KIRU.
+  They are live and they reach Labi.
 
-  COLLECTIONS is intentionally absent from the nav, per the brief.
+  COLLECTIONS is intentionally absent from the nav, per the brief. PRICES is
+  gone too: the price list now lives on the reservation page, beside the
+  service it prices, so there is one list rather than two that can disagree.
+
+  The opening hours here are rendered from assets/booking-data.js at load, not
+  typed into this file. Published hours that contradict the hours the booking
+  page will actually sell are the classic failure of a salon site, and the only
+  way to make it impossible is to have one source.
 -->
 <link rel="icon" href="assets/favicon.png" type="image/png">
 <link rel="stylesheet" href="assets/site.css">
@@ -38,13 +45,11 @@
     <h1 class="head__title">
       <a class="head__mark" href="#home" data-sec="home">
         <picture>
-          <source type="image/webp" srcset="assets/brand/kiru-logo.webp">
-          <img src="assets/brand/kiru-logo.png" width="880" height="363" alt="KIRU — hair by night">
+          <source type="image/webp" srcset="assets/brand/jillscutt-logo.webp">
+          <img src="assets/brand/jillscutt-logo.png" width="1000" height="200" alt="JILL SCUTT">
         </picture>
-          <span class="tapa tapa--word" aria-hidden="true"></span>
-          <span class="tapa tapa--line" aria-hidden="true"></span>
-          <span class="tapa tapa--tag" aria-hidden="true"></span>
-          <span class="tapa tapa--kanji" aria-hidden="true"></span>
+        <span class="tapa tapa--word" aria-hidden="true"></span>
+        <span class="tapa tapa--line" aria-hidden="true"></span>
       </a>
     </h1>
   </header>
@@ -52,42 +57,36 @@
   <main id="main-content">
 
     <section class="section is-active" id="home">
+      <!--
+        Two photographs in one frame. Tapping swaps them with a cross-fade —
+        both are 3:4 and both are absolutely positioned in the same box, so the
+        swap changes nothing about the layout and there is no reflow to see.
+        It is a <button> rather than a click handler on the figure so it is
+        reachable by keyboard and announces itself.
+      -->
       <figure class="figure">
-        <picture>
-          <source type="image/webp" sizes="(max-width: 759px) 100vw, 46vw" srcset="assets/img/hero-480.webp 480w, assets/img/hero-720.webp 720w, assets/img/hero-1080.webp 1080w, assets/img/hero-1440.webp 1440w">
-          <img src="assets/img/hero-1080.jpg" width="1440" height="1920" decoding="async" alt="Black and white portrait of a client, hair cut short and textured">
-        </picture>
+        <button class="figure__swap" type="button"
+                aria-label="Show the next photograph" aria-live="polite">
+          <picture class="shot is-on">
+            <source type="image/webp" sizes="(max-width: 759px) 100vw, 46vw" srcset="assets/img/hero-480.webp 480w, assets/img/hero-720.webp 720w, assets/img/hero-1080.webp 1080w, assets/img/hero-1440.webp 1440w">
+            <img src="assets/img/hero-1080.jpg" width="1440" height="1920" decoding="async" alt="Black and white portrait, hair cut short and textured">
+          </picture>
+          <picture class="shot">
+            <source type="image/webp" sizes="(max-width: 759px) 100vw, 46vw" srcset="assets/img/hero2-480.webp 480w, assets/img/hero2-720.webp 720w, assets/img/hero2-1080.webp 1080w, assets/img/hero2-1440.webp 1440w">
+            <img src="assets/img/hero2-1080.jpg" width="1440" height="1920" loading="lazy" decoding="async" alt="Portrait, long hair with balayage colour">
+          </picture>
+        </button>
         <span class="tapa" aria-hidden="true"></span>
       </figure>
+      <p class="figure__cue" aria-hidden="true">TAP TO SWAP</p>
     </section>
 
     <section class="section" id="intro" aria-label="Intro">
       <div class="content">
-        <p>KIRU is one chair on Klapdorp. The door opens when most of the city has already closed for the night.</p>
-        <p>There is no men's price here and no women's price. What you pay follows the length of your hair and the work it takes: clippers, clippers and scissors, or scissors only. Three prices, and the same three for everyone.</p>
-        <p>Alabi puts it more plainly than we can. &ldquo;I don't do genders, I do hair &hellip; Same prices for all.&rdquo;</p>
-        <p>Wednesday, Thursday and Friday the door opens at 20:00 and stays open until 22:00. Sunday and Monday, all day. Book the chair and the time is yours.</p>
-      </div>
-    </section>
-
-    <section class="section" id="prices" aria-label="Prices">
-      <div class="box">
-        <span class="rule" aria-hidden="true"></span>
-
-        <div class="item">
-          <p class="desc">SHORT HAIR</p>
-          <p class="value">35</p>
-        </div>
-        <div class="item">
-          <p class="desc">MID-LENGTH HAIR</p>
-          <p class="value">40</p>
-        </div>
-        <div class="item">
-          <p class="desc">LONG HAIR</p>
-          <p class="value">45</p>
-        </div>
-
-        <p class="legend">All prices in euro. Cuts run 20 to 30 minutes.</p>
+        <p>JILL SCUTT is two chairs on Klapdorp. Labi cuts. Donovan colours.</p>
+        <p>The room stays open late on purpose. Monday to Friday the door opens at 10:00 and does not close until 22:00, with an hour's rest in the middle of the day. Weekends the chairs are empty.</p>
+        <p>Cuts, colour, balayage and blow-dry, priced by the work each one takes rather than by the half hour. The full list sits on the reservation page, next to the button that books it.</p>
+        <p>Book the chair and the time is yours.</p>
       </div>
     </section>
 
@@ -96,7 +95,7 @@
         <span class="rule" aria-hidden="true"></span>
 
         <div class="item">
-          <p class="desc">KIRU</p>
+          <p class="desc">JILL SCUTT</p>
           <p class="value"></p>
         </div>
         <div class="item">
@@ -133,13 +132,22 @@
           <p class="desc">OPENING HOURS</p>
           <p class="value"></p>
         </div>
-        <div class="item"><p class="desc">MON</p><p class="value">10-22</p></div>
-        <div class="item"><p class="desc">TUE</p><p class="value">/</p></div>
-        <div class="item"><p class="desc">WED</p><p class="value">20-22</p></div>
-        <div class="item"><p class="desc">THU</p><p class="value">20-22</p></div>
-        <div class="item"><p class="desc">FRI</p><p class="value">20-22</p></div>
-        <div class="item"><p class="desc">SAT</p><p class="value">/</p></div>
-        <div class="item"><p class="desc">SUN</p><p class="value">10-22</p></div>
+        <!--
+          Rendered from assets/booking-data.js by the script at the foot of this
+          page. The rows below are the no-JavaScript fallback and are replaced
+          wholesale on load; they are written out here so the hours are in the
+          HTML for a reader without scripts, and a test asserts the two agree.
+        -->
+        <div id="hours-rows">
+          <div class="item"><p class="desc">MON</p><p class="value">10:00-22:00</p></div>
+          <div class="item"><p class="desc">TUE</p><p class="value">10:00-22:00</p></div>
+          <div class="item"><p class="desc">WED</p><p class="value">10:00-22:00</p></div>
+          <div class="item"><p class="desc">THU</p><p class="value">10:00-22:00</p></div>
+          <div class="item"><p class="desc">FRI</p><p class="value">10:00-22:00</p></div>
+          <div class="item"><p class="desc">SAT</p><p class="value">/</p></div>
+          <div class="item"><p class="desc">SUN</p><p class="value">/</p></div>
+        </div>
+        <p class="legend" id="hours-break">Closed for a break 14:00-15:00.</p>
       </div>
     </section>
 
@@ -148,9 +156,8 @@
   <nav id="main-navigation" aria-label="Primary">
     <ul>
       <li data-sec="intro" data-text="INTRO">INTRO</li>
-      <li data-sec="prices" data-text="PRICES">PRICES</li>
       <li data-sec="contact" data-text="CONTACT">CONTACT</li>
-      <li data-text="MAKE A RESERVATION"><a href="reservation.html">MAKE A RESERVATION</a></li>
+      <li data-text="RESERVATION"><a href="reservation.html">RESERVATION</a></li>
     </ul>
   </nav>
 
@@ -158,14 +165,15 @@
     <ul>
       <li data-sec="home" data-text="HOME">HOME</li>
       <li data-sec="intro" data-text="INTRO">INTRO</li>
-      <li data-sec="prices" data-text="PRICES">PRICES</li>
       <li data-sec="contact" data-text="CONTACT">CONTACT</li>
-      <li data-text="MAKE A RESERVATION"><a href="reservation.html">MAKE A RESERVATION</a></li>
+      <li data-text="RESERVATION"><a href="reservation.html">RESERVATION</a></li>
     </ul>
   </nav>
 
 </div>
 
+<script src="assets/booking-data.js"></script>
+<script src="assets/booking-core.js"></script>
 <script>
 (function () {
   /*
@@ -185,11 +193,55 @@
   var navItems = document.querySelectorAll('[data-sec]');
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  /* ---- opening hours, painted from the booking data ------------------- */
+
+  /*
+    The same values the booking page sells slots from. Repainting at runtime
+    rather than trusting the markup means the published hours cannot survive a
+    change to booking-data.js that nobody remembered to mirror here.
+  */
+  (function paintHours() {
+    if (!window.SHOP || !window.BookingCore) return;
+    var host = document.getElementById('hours-rows');
+    if (!host) return;
+    host.textContent = '';
+    window.BookingCore.hoursRows(window.SHOP).forEach(function (r) {
+      var item = document.createElement('div');
+      item.className = 'item';
+      var d = document.createElement('p'); d.className = 'desc'; d.textContent = r.label;
+      var v = document.createElement('p'); v.className = 'value'; v.textContent = r.value;
+      item.appendChild(d); item.appendChild(v);
+      host.appendChild(item);
+    });
+    var br = document.getElementById('hours-break');
+    var label = window.BookingCore.breakLabel(window.SHOP);
+    if (br) br.textContent = label ? 'Closed for a break ' + label + '.' : '';
+  })();
+
   /* ---- the opening reveal (ISU timings live in the stylesheet) --------- */
 
   function reveal() { page.classList.add('is-revealed'); }
   // Two frames, so the covers are painted at scaleX(1) before they transition.
   requestAnimationFrame(function () { requestAnimationFrame(reveal); });
+
+  /* ---- the two-photograph hero ---------------------------------------- */
+
+  (function heroSwap() {
+    var swap = document.querySelector('.figure__swap');
+    if (!swap) return;
+    var shots = swap.querySelectorAll('.shot');
+    if (shots.length < 2) return;
+    var at = 0;
+    swap.addEventListener('click', function () {
+      shots[at].classList.remove('is-on');
+      at = (at + 1) % shots.length;
+      shots[at].classList.add('is-on');
+      /* The alt text of the visible photo is what a screen reader should get
+         when the button is pressed, so move the label with it. */
+      var img = shots[at].querySelector('img');
+      if (img) swap.setAttribute('aria-label', 'Showing: ' + img.alt + '. Tap to swap.');
+    });
+  })();
 
   /* ---- section swap ---------------------------------------------------- */
 

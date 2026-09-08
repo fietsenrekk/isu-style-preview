@@ -56,7 +56,7 @@ if(!/\.37/.test(E.e1)||!/\.19/.test(E.e2)) fail.push('ISU easing tokens missing:
 else ok.push('ISU easings present (ease1 '+E.e1+', ease2 '+E.e2+')');
 
 // Transition: click a nav item, catch the blur mid-flight.
-await ev("document.querySelector('#main-navigation [data-sec=\"prices\"]').click()");
+await ev("document.querySelector('#main-navigation [data-sec=\"contact\"]').click()");
 await new Promise(r=>setTimeout(r,150));
 const midBlur=await ev("(()=>{const c=document.getElementById('main-content');return {filter:getComputedStyle(c).filter,curtain:document.getElementById('curtain').className};})()");
 if(!/blur/.test(midBlur.filter)) fail.push('no motion blur during the swap (filter: '+midBlur.filter+')');
@@ -66,10 +66,10 @@ else ok.push('curtain sweeping mid-swap ('+midBlur.curtain.trim()+')');
 
 await new Promise(r=>setTimeout(r,900));
 const after=await ev("(()=>{const c=document.getElementById('main-content');return {active:document.querySelector('.section.is-active').id,filter:getComputedStyle(c).filter,curtain:document.getElementById('curtain').className};})()");
-if(after.active!=='prices') fail.push('section did not settle on prices (got '+after.active+')');
+if(after.active!=="contact") fail.push('section did not settle on contact (got '+after.active+')');
 else if(after.filter!=='none') fail.push('blur left on after the swap ('+after.filter+')');
 else if(!/idle/.test(after.curtain)) fail.push('curtain not parked after the swap ('+after.curtain+')');
-else ok.push('swap settles clean: prices active, blur cleared, curtain idle');
+else ok.push('swap settles clean: contact active, blur cleared, curtain idle');
 
 // Grain present on the hero.
 await send('Page.navigate',{url:BASE+'/'});

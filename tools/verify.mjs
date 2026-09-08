@@ -1,250 +1,494 @@
 #!/usr/bin/env node
-/**
- * Verification for the ISU-style preview.
- *
- *   node tools/verify.mjs
- *
- * Loads every section at desktop and mobile, screenshots each, and checks the
- * things a screenshot alone cannot: console errors, failed requests, horizontal
- * overflow, silently clipped text, and that the measured typography still
- * matches what was taken off the reference site.
- */
+/*
+  End-to-end verification for the JILL SCUTT preview.
+
+  Drives a real headless Chrome over the DevTools Protocol and clicks the site
+  the way a visitor would: swaps the hero photograph, walks the whole booking
+  flow, and checks that the exclusion between Labi and the colour services
+  actually holds in the DOM rather than only in booking-core's unit tests.
+
+  Run against a local server:   node tools/verify.mjs
+  Run against the live URL:     VERIFY_ORIGIN=https://... node tools/verify.mjs
+*/
+
 import { spawn } from 'node:child_process';
-import { writeFile, rm, mkdir } from 'node:fs/promises';
+import { rm, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 
 const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const BASE = process.env.VERIFY_ORIGIN ?? 'http://localhost:4219';
-const OUT = path.resolve(import.meta.dirname, '..', '.shots');
-await mkdir(OUT, { recursive: true });
+const BASE = (process.env.VERIFY_ORIGIN ?? 'http://localhost:4219').replace(/\/$/, '');
+const SHOTS = process.env.VERIFY_SHOTS ? path.resolve(process.env.VERIFY_SHOTS) : null;
 
-const port = 9400 + Math.floor(Math.random() * 200);
-const profile = path.join(os.tmpdir(), `isuv-${port}`);
+const port = 9400 + Math.floor(Math.random() * 300);
+const profile = path.join(os.tmpdir(), 'verify-' + port);
 await rm(profile, { recursive: true, force: true });
+if (SHOTS) await mkdir(SHOTS, { recursive: true });
 
 const chrome = spawn(CHROME, [
-  '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`,
-  '--no-first-run', '--disable-gpu', '--hide-scrollbars', 'about:blank',
+  '--headless=new', '--remote-debugging-port=' + port, '--user-data-dir=' + profile,
+  '--no-first-run', '--disable-gpu', '--hide-scrollbars', 'about:blank'
 ], { stdio: 'ignore' });
 
 async function endpoint() {
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 100; i++) {
     try {
-      const r = await fetch(`http://127.0.0.1:${port}/json/version`);
+      const r = await fetch('http://127.0.0.1:' + port + '/json/version');
       if (r.ok) return (await r.json()).webSocketDebuggerUrl;
     } catch {}
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 150));
   }
-  throw new Error('Chrome DevTools did not come up');
+  throw new Error('Chrome did not come up');
 }
 
 const ws = new WebSocket(await endpoint());
 const pending = new Map();
-const events = [];
-let id = 0;
-await new Promise((r) => ws.addEventListener('open', r));
-ws.addEventListener('message', (e) => {
+let msgId = 0;
+await new Promise(r => ws.addEventListener('open', r));
+ws.addEventListener('message', e => {
   const m = JSON.parse(e.data);
   if (m.id && pending.has(m.id)) {
     const { res, rej } = pending.get(m.id);
     pending.delete(m.id);
     m.error ? rej(new Error(m.error.message)) : res(m.result);
-  } else if (m.method) events.push(m);
+  } else if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') {
+    consoleErrors.push(m.params.args.map(a => a.value ?? a.description ?? '?').join(' '));
+  } else if (m.method === 'Runtime.exceptionThrown') {
+    consoleErrors.push('uncaught: ' + (m.params.exceptionDetails.exception?.description
+      ?? m.params.exceptionDetails.text));
+  } else if (m.method === 'Network.responseReceived' && m.params.response.status >= 400) {
+    badResponses.push(m.params.response.status + ' ' + m.params.response.url);
+  }
 });
 const raw = (method, params = {}, sessionId) => new Promise((res, rej) => {
-  const n = ++id;
-  pending.set(n, { res, rej });
-  ws.send(JSON.stringify({ id: n, method, params, sessionId }));
+  const id = ++msgId;
+  pending.set(id, { res, rej });
+  ws.send(JSON.stringify({ id, method, params, sessionId }));
 });
 
+let consoleErrors = [], badResponses = [];
 const { targetId } = await raw('Target.createTarget', { url: 'about:blank' });
 const { sessionId } = await raw('Target.attachToTarget', { targetId, flatten: true });
 const send = (m, p) => raw(m, p, sessionId);
+await send('Page.enable'); await send('Runtime.enable'); await send('Network.enable');
 
-await send('Page.enable');
-await send('Runtime.enable');
-await send('Log.enable');
-await send('Network.enable');
-
-const ev = async (expression) => {
+const evaluate = async (expr) => {
   const { result, exceptionDetails } = await send('Runtime.evaluate', {
-    expression, returnByValue: true, awaitPromise: true,
+    expression: expr, returnByValue: true, awaitPromise: true
   });
-  if (exceptionDetails) throw new Error(exceptionDetails.text);
+  if (exceptionDetails) throw new Error(exceptionDetails.text + ' :: ' + expr.slice(0, 120));
   return result.value;
 };
 
-async function load(url, w, h, mobile) {
-  await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile });
-  events.length = 0;
+const pass = [], fail = [];
+const ok = (m) => pass.push(m);
+const no = (m) => fail.push(m);
+const check = (cond, good, bad) => cond ? ok(good) : no(bad);
+
+async function viewport(w, h, mobile = false) {
+  await send('Emulation.setDeviceMetricsOverride',
+    { width: w, height: h, deviceScaleFactor: 1, mobile });
+}
+async function goto(url) {
+  consoleErrors = []; badResponses = [];
   await send('Page.navigate', { url });
-  await new Promise((r) => setTimeout(r, 1200));
-  await ev('document.fonts.ready');
-  await new Promise((r) => setTimeout(r, 900));
+  await evaluate('new Promise(r => { if (document.readyState === "complete") r(1);'
+    + ' else addEventListener("load", () => r(1)); })');
+  await new Promise(r => setTimeout(r, 2400));   // clear of the 1.55s reveal
 }
 async function shot(name) {
+  if (!SHOTS) return;
   const { data } = await send('Page.captureScreenshot', { format: 'png' });
-  await writeFile(path.join(OUT, name), Buffer.from(data, 'base64'));
+  await writeFile(path.join(SHOTS, name + '.png'), Buffer.from(data, 'base64'));
 }
-const errorsNow = () => events
-  .filter((e) => e.method === 'Log.entryAdded' && e.params.entry.level === 'error')
-  .map((e) => e.params.entry.text);
-const badNow = () => events
-  .filter((e) => e.method === 'Network.responseReceived' && e.params.response.status >= 400)
-  .map((e) => `${e.params.response.status} ${e.params.response.url}`);
-
-const fail = [];
-const ok = [];
-const SECTIONS = ['home', 'intro', 'prices', 'contact'];
-
-/* ------------------------------------------------------------- desktop --- */
-
-await load(BASE + '/', 1440, 900, false);
-if (errorsNow().length) fail.push(`desktop console: ${errorsNow().join(' | ')}`);
-if (badNow().length) fail.push(`desktop HTTP>=400: ${badNow().join(' | ')}`);
-
-for (const sec of SECTIONS) {
-  await ev(`document.querySelector('#main-navigation [data-sec="${sec}"], .head__mark[data-sec="${sec}"]').click()`);
-  await new Promise((r) => setTimeout(r, 900));
-  await shot(`d-${sec}.png`);
-  const s = await ev(`(() => { const s = document.getElementById('${sec}');
-    const r = s.getBoundingClientRect();
-    return { active: s.classList.contains('is-active'), h: Math.round(r.height),
-      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth }; })()`);
-  if (!s.active) fail.push(`desktop: #${sec} did not activate`);
-  else if (s.h < 50) fail.push(`desktop: #${sec} active but only ${s.h}px tall`);
-  else if (s.overflow) fail.push(`desktop: #${sec} causes horizontal overflow`);
-  else ok.push(`desktop #${sec} renders (${s.h}px), no overflow`);
+/* Click by selector and let the transition settle. */
+async function click(sel, settle = 420) {
+  const hit = await evaluate(`(() => { const n = document.querySelector(${JSON.stringify(sel)});
+    if (!n) return false; n.click(); return true; })()`);
+  if (!hit) throw new Error('no element for ' + sel);
+  await new Promise(r => setTimeout(r, settle));
+  return hit;
 }
 
-const type = await ev(`(() => {
-  const li = document.querySelector('#main-navigation li[data-sec="contact"]');
-  const desc = document.querySelector('#contact .item .desc');
-  const val = document.querySelector('#contact .item .value');
-  const rule = document.querySelector('#contact .rule');
-  const g = (el) => el ? getComputedStyle(el) : null;
-  const l = g(li), d = g(desc), v = g(val), r = g(rule);
-  return { navFont: l.fontFamily, navSize: l.fontSize, selected: li.classList.contains('selected'),
-    descFont: d.fontFamily, descSize: d.fontSize, descAlign: d.textAlign,
-    valAlign: v.textAlign, ruleW: r.width, ruleBg: r.backgroundColor };
+/* ====================================================================== */
+console.log('\nverifying ' + BASE + '\n');
+
+/* ---------------------------------------------------------- desktop ----- */
+await viewport(1440, 900);
+await goto(BASE + '/');
+
+check(await evaluate(`document.title.includes('JILL SCUTT')`),
+  'page is branded JILL SCUTT', 'title is not JILL SCUTT');
+
+/* The wordmark: present, right shape, and not sitting in a white box. */
+const logo = await evaluate(`(() => {
+  const img = document.querySelector('.head__mark img');
+  if (!img) return null;
+  const r = img.getBoundingClientRect();
+  return { w: Math.round(r.width), h: Math.round(r.height), right: Math.round(r.right),
+           top: Math.round(r.top), nat: img.naturalWidth + 'x' + img.naturalHeight,
+           src: img.currentSrc, complete: img.complete };
 })()`);
-if (!/Bebas/.test(type.navFont) || type.navSize !== '22px') fail.push(`nav type wrong: ${type.navFont} ${type.navSize}`);
-if (!/Bebas/.test(type.descFont) || type.descSize !== '22px') fail.push(`price/contact type wrong: ${type.descFont} ${type.descSize}`);
-if (type.descAlign !== 'right' || type.valAlign !== 'left') fail.push(`column alignment wrong: ${type.descAlign}/${type.valAlign}`);
-if (type.ruleW !== '6px') fail.push(`centre rule should be 6px, got ${type.ruleW}`);
-if (!type.selected) fail.push('nav .selected state not applied');
-if (fail.length === 0) ok.push(`typography matches reference (Bebas 22px, ${type.descAlign}/${type.valAlign}, ${type.ruleW} rule)`);
+check(logo && logo.complete && logo.w > 0, 'wordmark loaded (' + (logo && logo.nat) + ')',
+  'wordmark did not load: ' + JSON.stringify(logo));
+check(logo && Math.abs((logo.w / logo.h) - 9.093) < 0.35,
+  'wordmark keeps its 9.09:1 proportion (' + (logo && (logo.w / logo.h).toFixed(2)) + ')',
+  'wordmark is distorted: ' + JSON.stringify(logo));
+check(logo && logo.w >= 240, 'wordmark is legible at ' + (logo && logo.w) + 'px wide',
+  'wordmark is only ' + (logo && logo.w) + 'px wide');
 
-/* silently clipped text */
-const clipped = [];
-for (const sec of ['intro', 'prices', 'contact']) {
-  await ev(`document.querySelector('#main-navigation [data-sec="${sec}"]').click()`);
-  await new Promise((r) => setTimeout(r, 900));
-  /*
-    .legend is exempt on purpose. It is set `white-space: nowrap` and is meant
-    to run past its 500px column, exactly as ISU's does, so scrollWidth always
-    exceeds clientWidth for it. That is intentional overflow, not clipping —
-    it is asserted separately below against the viewport edge, which is the
-    thing that would actually cut it off.
-  */
-  const c = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('#${sec} p, #${sec} a')]
-    .filter(el => !el.classList.contains('legend'))
-    .filter(el => el.scrollWidth - el.clientWidth > 2 && el.clientWidth >= 4)
-    .map(el => el.className + ' :: ' + el.textContent.trim().slice(0, 40)))`));
-  if (c.length) clipped.push(`${sec}: ${c.join(' | ')}`);
+/* Transparency: the pixel just inside the logo box, away from ink, must be the
+   page's paper colour. A white-boxed PNG would read 255,255,255 against
+   #fcfcfc = 252. Sampled by drawing the actual served file to a canvas. */
+const alpha = await evaluate(`(async () => {
+  const img = document.querySelector('.head__mark img');
+  const im = new Image(); im.crossOrigin = 'anonymous'; im.src = img.currentSrc;
+  await im.decode();
+  const c = document.createElement('canvas');
+  c.width = im.naturalWidth; c.height = im.naturalHeight;
+  const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+  const corners = [[1,1],[im.naturalWidth-2,1],[1,im.naturalHeight-2],
+                   [im.naturalWidth-2,im.naturalHeight-2]];
+  return corners.map(([a,b]) => x.getImageData(a,b,1,1).data[3]);
+})()`);
+check(Array.isArray(alpha) && alpha.every(a => a === 0),
+  'wordmark corners are fully transparent (alpha ' + JSON.stringify(alpha) + ')',
+  'wordmark carries a background: corner alpha ' + JSON.stringify(alpha));
+
+/* Nav wording. */
+const navText = await evaluate(
+  `[...document.querySelectorAll('#main-navigation li')].map(n => n.textContent.trim())`);
+check(JSON.stringify(navText) === JSON.stringify(['INTRO', 'CONTACT', 'RESERVATION']),
+  'desktop nav reads INTRO / CONTACT / RESERVATION',
+  'desktop nav is ' + JSON.stringify(navText));
+check(!navText.some(t => /PRICES/i.test(t)), 'PRICES is gone from the nav',
+  'PRICES still in the nav');
+check(!navText.some(t => /MAKE A/i.test(t)), '"MAKE A RESERVATION" is now "RESERVATION"',
+  'nav still says MAKE A RESERVATION');
+check(await evaluate(`!document.getElementById('prices')`),
+  'the prices section is gone from the page', 'a #prices section is still present');
+
+/* Each section renders and nothing overflows. */
+for (const id of ['home', 'intro', 'contact']) {
+  if (id !== 'home') await click(`#main-navigation [data-sec="${id}"]`, 900);
+  const s = await evaluate(`(() => {
+    const n = document.getElementById(${JSON.stringify(id)});
+    const r = n.getBoundingClientRect();
+    return { active: n.classList.contains('is-active'), h: Math.round(r.height),
+             overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+  })()`);
+  check(s.active && s.h > 40, `desktop #${id} renders (${s.h}px)`,
+    `desktop #${id} did not render: ${JSON.stringify(s)}`);
+  check(s.overflow <= 0, `desktop #${id} has no horizontal overflow`,
+    `desktop #${id} overflows by ${s.overflow}px`);
 }
-if (clipped.length) fail.push(`clipped text: ${clipped.join(' || ')}`);
-else ok.push('no clipped text in any desktop section');
+await shot('d-contact');
 
-/* The legend must stay inside the viewport at the widest and the narrowest
-   desktop width it is used at. */
-for (const w of [1440, 901]) {
-  await load(BASE + '/', w, 900, false);
-  await ev(`document.querySelector('#main-navigation [data-sec="prices"]').click()`);
-  await new Promise((r) => setTimeout(r, 900));
-  const bounds = await ev(`(() => { const l = document.querySelector('#prices .legend');
-    const r = l.getBoundingClientRect();
-    return { right: Math.round(r.right), vw: document.documentElement.clientWidth,
-      hiddenByAncestor: (() => { let el = l.parentElement;
-        while (el) { const o = getComputedStyle(el).overflowX;
-          if (o === 'hidden' || o === 'clip') {
-            const p = el.getBoundingClientRect();
-            if (r.right > p.right + 1) return true;
-          } el = el.parentElement; } return false; })() }; })()`);
-  if (bounds.right > bounds.vw) fail.push(`legend runs off the viewport at ${w}px (right ${bounds.right} > ${bounds.vw})`);
-  else if (bounds.hiddenByAncestor) fail.push(`legend is clipped by an ancestor at ${w}px`);
-  else ok.push(`legend fits at ${w}px (ends at ${bounds.right} of ${bounds.vw})`);
+/* Opening hours: what is published must equal what booking-data holds. */
+const hours = await evaluate(`(() => {
+  const rows = [...document.querySelectorAll('#hours-rows .item')].map(i => [
+    i.querySelector('.desc').textContent.trim(), i.querySelector('.value').textContent.trim()]);
+  return { rows, brk: document.getElementById('hours-break').textContent.trim(),
+           fromData: BookingCore.hoursRows(SHOP).map(r => [r.label, r.value]) };
+})()`);
+check(JSON.stringify(hours.rows) === JSON.stringify(hours.fromData),
+  'published hours are rendered from booking-data, and match it',
+  'published hours differ from booking-data:\n     page ' + JSON.stringify(hours.rows)
+  + '\n     data ' + JSON.stringify(hours.fromData));
+check(JSON.stringify(hours.rows.slice(0, 5).map(r => r[1]))
+      === JSON.stringify(Array(5).fill('10:00-22:00')),
+  'Monday to Friday read 10:00-22:00', 'weekday hours are ' + JSON.stringify(hours.rows));
+check(hours.rows[5][1] === '/' && hours.rows[6][1] === '/',
+  'Saturday and Sunday are closed', 'weekend is not closed: ' + JSON.stringify(hours.rows.slice(5)));
+check(/14:00-15:00/.test(hours.brk), 'the afternoon break is published (' + hours.brk + ')',
+  'break not shown: ' + hours.brk);
+
+/* No clipped text anywhere. */
+const clipped = await evaluate(`(() => {
+  const out = [];
+  document.querySelectorAll('.section.is-active p, .section.is-active .desc, .section.is-active .value')
+    .forEach(n => {
+      if (n.scrollWidth > n.clientWidth + 1 && getComputedStyle(n).overflow !== 'visible')
+        out.push(n.textContent.trim().slice(0, 30));
+    });
+  return out;
+})()`);
+check(clipped.length === 0, 'no clipped text in the contact section',
+  'clipped: ' + JSON.stringify(clipped));
+
+/* ------------------------------------------------- the two-photo hero --- */
+await click('#main-navigation [data-sec="intro"]', 900);
+await goto(BASE + '/');
+const swap0 = await evaluate(`(() => {
+  const on = document.querySelector('.shot.is-on img');
+  return { src: on.currentSrc, idx: [...document.querySelectorAll('.shot')]
+    .findIndex(s => s.classList.contains('is-on')) };
+})()`);
+await click('.figure__swap', 1000);
+const swap1 = await evaluate(`(() => {
+  const on = document.querySelector('.shot.is-on img');
+  const r = on.getBoundingClientRect();
+  return { src: on.currentSrc, idx: [...document.querySelectorAll('.shot')]
+    .findIndex(s => s.classList.contains('is-on')),
+    complete: on.complete, nat: on.naturalWidth + 'x' + on.naturalHeight,
+    w: Math.round(r.width), h: Math.round(r.height),
+    op: getComputedStyle(on.closest('.shot')).opacity };
+})()`);
+check(swap1.idx === 1 && swap1.src !== swap0.src,
+  'tapping the photograph swaps to the second one',
+  'the photo did not swap: ' + JSON.stringify({ swap0, swap1 }));
+check(swap1.complete && swap1.nat !== '0x0',
+  'the second photograph loaded (' + swap1.nat + ')',
+  'second photograph failed to load: ' + JSON.stringify(swap1));
+check(swap1.op === '1', 'the second photograph is fully faded in',
+  'second photo opacity is ' + swap1.op);
+await shot('d-home-photo2');
+
+/* The frames must be identical, or the swap would jump the layout. */
+const frame0 = await evaluate(`(() => { const r = document.querySelectorAll('.shot')[0]
+  .getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })()`);
+check(frame0[0] === swap1.w && frame0[1] === swap1.h,
+  'both photographs occupy the identical frame — no layout shift on swap',
+  'frames differ: ' + JSON.stringify(frame0) + ' vs ' + JSON.stringify([swap1.w, swap1.h]));
+
+await click('.figure__swap', 1000);
+check(await evaluate(`[...document.querySelectorAll('.shot')]
+  .findIndex(s => s.classList.contains('is-on')) === 0`),
+  'tapping again returns to the first photograph', 'the swap does not cycle back');
+
+check(await evaluate(`getComputedStyle(document.querySelector('.shot')).transition.includes('opacity')`),
+  'the swap is an eased cross-fade, not a cut', 'the photo swap has no transition');
+
+/* =================================================== the booking page === */
+await goto(BASE + '/reservation.html');
+await shot('d-reservation');
+
+check(await evaluate(`!!document.querySelector('#booking.is-live')`),
+  'the booking interface took over the page', 'the booking UI did not mount');
+check(await evaluate(`document.querySelectorAll('#booking .step').length === 5`),
+  'all five booking steps are present',
+  'steps found: ' + await evaluate(`document.querySelectorAll('#booking .step').length`));
+check(badResponses.length === 0, 'reservation page loads every asset',
+  'failed requests: ' + JSON.stringify(badResponses));
+
+/* Every price on the page must equal the price in the data. */
+const prices = await evaluate(`(() => {
+  const rows = [...document.querySelectorAll('.step[data-step="2"] .item--pick')].map(b => [
+    b.querySelector('.desc').textContent.trim(), b.querySelector('.value').textContent.trim()]);
+  const data = SHOP.services.map(s => [s.name, BookingCore.priceLabel(s)]);
+  return { rows, data };
+})()`);
+check(JSON.stringify(prices.rows) === JSON.stringify(prices.data),
+  'all 12 services are listed with the price beside each option',
+  'service list differs from the data:\n     ' + JSON.stringify(prices.rows));
+check(prices.rows.length === 12, '12 services shown', prices.rows.length + ' services shown');
+check(prices.rows.some(r => r[1] === 'from 160'),
+  'balayage shows as a "from" price, not a fixed one',
+  'balayage price label is wrong: ' + JSON.stringify(prices.rows.find(r => /Balayage/.test(r[0]))));
+check(prices.rows.some(r => r[1] === '7.50'), 'the 7.50 wash keeps its cents',
+  'wash price is ' + JSON.stringify(prices.rows.find(r => /Wash$/.test(r[0]))));
+
+/* --- the exclusion, both directions, in the live DOM ------------------- */
+const DONOVAN_ONLY = ['half-head-highlights', 'full-head-highlights', 'balayage', 'toner'];
+
+/* Direction 1: choose Labi, the four colour services must go dead. */
+await click('.step[data-step="1"] .item--pick:nth-of-type(1)');
+const afterLabi = await evaluate(`(() => {
+  const out = {};
+  SHOP.services.forEach((s, i) => {
+    const b = document.querySelectorAll('.step[data-step="2"] .item--pick')[i];
+    out[s.id] = { off: b.classList.contains('is-off'), disabled: b.disabled };
+  });
+  return { services: out, picked: document.querySelector('.step[data-step="1"] .is-picked')
+    ?.querySelector('.desc').textContent.trim() };
+})()`);
+check(afterLabi.picked === 'LABI', 'LABI can be selected', 'LABI did not select');
+check(DONOVAN_ONLY.every(id => afterLabi.services[id].off && afterLabi.services[id].disabled),
+  'choosing LABI disables highlights, balayage and toner',
+  'exclusion failed: ' + JSON.stringify(DONOVAN_ONLY.map(id => [id, afterLabi.services[id]])));
+check(Object.entries(afterLabi.services)
+  .filter(([id]) => !DONOVAN_ONLY.includes(id)).every(([, v]) => !v.off),
+  'choosing LABI leaves her other 8 services selectable',
+  'too much was disabled: ' + JSON.stringify(afterLabi.services));
+await shot('d-booking-labi');
+
+/* A disabled row must actually refuse the click, not merely look grey. */
+const balayageIdx = await evaluate(`SHOP.services.findIndex(s => s.id === 'balayage')`);
+await click(`.step[data-step="2"] .item--pick:nth-of-type(${balayageIdx + 1})`, 300);
+check(await evaluate(`!document.querySelector('.step[data-step="2"] .is-picked')`),
+  'a disabled service cannot be clicked into selection',
+  'a disabled service was selectable');
+
+/* Direction 2: clear Labi, pick balayage, Labi must go dead. */
+await click('.step[data-step="1"] .item--pick:nth-of-type(1)');   // deselect
+await click(`.step[data-step="2"] .item--pick:nth-of-type(${balayageIdx + 1})`);
+const afterBalayage = await evaluate(`(() => {
+  const st = [...document.querySelectorAll('.step[data-step="1"] .item--pick')];
+  return { labiOff: st[0].classList.contains('is-off') && st[0].disabled,
+           donovanOff: st[1].classList.contains('is-off'),
+           donovanPicked: st[1].classList.contains('is-picked'),
+           servicePicked: document.querySelector('.step[data-step="2"] .is-picked')
+             ?.querySelector('.desc').textContent.trim() };
+})()`);
+check(afterBalayage.servicePicked === 'Balayage', 'balayage can be selected',
+  'balayage did not select: ' + JSON.stringify(afterBalayage));
+check(afterBalayage.labiOff, 'choosing balayage disables LABI',
+  'LABI was not disabled by balayage: ' + JSON.stringify(afterBalayage));
+check(!afterBalayage.donovanOff, 'DONOVAN stays available for balayage',
+  'DONOVAN was wrongly disabled');
+check(afterBalayage.donovanPicked,
+  'the only stylist who can do it is selected automatically',
+  'DONOVAN was not auto-selected for a Donovan-only service');
+
+/* --- days and times ---------------------------------------------------- */
+const step3 = await evaluate(`(() => {
+  const s = document.querySelector('.step[data-step="3"]');
+  const chips = [...s.querySelectorAll('.chip--day')].map(c => c.textContent.trim());
+  return { open: s.classList.contains('is-open'), chips,
+           dows: [...s.querySelectorAll('.chip__dow')].map(n => n.textContent) };
+})()`);
+check(step3.open, 'choosing a service opens the day step', 'the day step stayed shut');
+check(step3.chips.length > 0, step3.chips.length + ' bookable days offered', 'no days offered');
+check(!step3.dows.includes('SAT') && !step3.dows.includes('SUN'),
+  'no Saturday or Sunday is ever offered',
+  'a weekend day was offered: ' + JSON.stringify(step3.dows));
+
+await click('.step[data-step="3"] .chip--day:nth-of-type(1)', 500);
+const step4 = await evaluate(`(() => {
+  const s = document.querySelector('.step[data-step="4"]');
+  const times = [...s.querySelectorAll('.chip--time')].map(c => c.textContent.trim());
+  const sv = SHOP.services.find(x => x.id === 'balayage');
+  return { open: s.classList.contains('is-open'), times, minutes: sv.minutes };
+})()`);
+check(step4.open, 'choosing a day opens the time step', 'the time step stayed shut');
+check(step4.times.length > 0, step4.times.length + ' start times offered for a 180-minute balayage',
+  'no times offered');
+/* The break and the closing time, checked on what is actually on screen. */
+const bad = step4.times.filter(t => {
+  const [h, m] = t.split(':').map(Number); const s = h * 60 + m;
+  return (s < 900 && s + step4.minutes > 840) || (s + step4.minutes > 1320) || (s < 600);
+});
+check(bad.length === 0,
+  'every offered time respects the 14:00-15:00 break and the 22:00 close',
+  'these offered times are impossible: ' + JSON.stringify(bad));
+check(!step4.times.includes('13:00'),
+  'a 180-minute service is not offered at 13:00, which would run through the break',
+  '13:00 was offered for a 3-hour service');
+
+await click('.step[data-step="4"] .chip--time:nth-of-type(1)', 500);
+const step5 = await evaluate(`(() => {
+  const s = document.querySelector('.step[data-step="5"]');
+  return { open: s.classList.contains('is-open'),
+           summary: s.querySelector('.bsummary').textContent.trim(),
+           fields: [...s.querySelectorAll('.bfield input, .bfield textarea')].map(i => i.name),
+           note: s.querySelector('.bnote').textContent.trim() };
+})()`);
+check(step5.open, 'choosing a time opens the details step', 'the details step stayed shut');
+check(JSON.stringify(step5.fields) === JSON.stringify(['name', 'email', 'phone', 'notes']),
+  'the details form asks for name, e-mail, phone and notes',
+  'form fields are ' + JSON.stringify(step5.fields));
+check(/Balayage/.test(step5.summary) && /from 160/.test(step5.summary)
+      && /DONOVAN/.test(step5.summary),
+  'the summary states the service, the price and the stylist',
+  'summary reads: ' + step5.summary);
+check(step5.note.length > 20, 'the form says what pressing the button will do',
+  'no explanatory note under the submit button');
+await shot('d-booking-full');
+
+/* The form must refuse to submit empty. */
+const guarded = await evaluate(`(() => {
+  const f = document.querySelector('.bform');
+  f.querySelector('[name=name]').value = '';
+  return f.checkValidity() === false;
+})()`);
+check(guarded, 'the form will not submit without a name', 'the form submits empty');
+
+check(consoleErrors.length === 0, 'no console errors through the whole booking flow',
+  'console errors: ' + JSON.stringify(consoleErrors));
+
+/* ------------------------------------------------------------ mobile ---- */
+await viewport(390, 844, true);
+await goto(BASE + '/');
+
+for (const id of ['home', 'intro', 'contact']) {
+  await click('#ico-nav', 320);
+  await click(`#main-navigation-mobile [data-sec="${id}"]`, 900);
+  const s = await evaluate(`(() => {
+    const n = document.getElementById(${JSON.stringify(id)});
+    return { active: n.classList.contains('is-active'),
+             h: Math.round(n.getBoundingClientRect().height),
+             menuOpen: document.getElementById('main-navigation-mobile').classList.contains('open'),
+             overflow: document.documentElement.scrollWidth - 390 };
+  })()`);
+  check(s.active && s.h > 40, `mobile #${id} renders (${s.h}px)`,
+    `mobile #${id} failed: ${JSON.stringify(s)}`);
+  check(!s.menuOpen, `mobile menu closes after choosing ${id}`, `menu stayed open on ${id}`);
+  check(s.overflow <= 0, `mobile #${id} has no horizontal overflow`,
+    `mobile #${id} overflows by ${s.overflow}px`);
 }
+await shot('m-contact');
 
-/* ---------------------------------------------------------- reservation --- */
+const mLogo = await evaluate(`(() => { const r = document.querySelector('.head__mark img')
+  .getBoundingClientRect(); return { w: Math.round(r.width), right: Math.round(r.right) }; })()`);
+check(mLogo.w >= 150, 'the wordmark stays legible on a phone (' + mLogo.w + 'px)',
+  'wordmark is only ' + mLogo.w + 'px on mobile');
+check(mLogo.right <= 390, 'the wordmark does not run off the right edge',
+  'wordmark right edge is at ' + mLogo.right + ' of 390');
 
-await load(BASE + '/reservation.html', 1440, 900, false);
-if (errorsNow().length) fail.push(`reservation console: ${errorsNow().join(' | ')}`);
-if (badNow().length) fail.push(`reservation HTTP>=400: ${badNow().join(' | ')}`);
-await shot('d-reservation.png');
-const res = await ev(`(() => { const f = document.querySelector('.booking__frame');
-  const fb = document.querySelector('.reserve-fallback a');
-  return { src: f ? f.src : null, h: f ? Math.round(f.getBoundingClientRect().height) : 0,
-    fallback: fb ? fb.href : null,
-    overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth }; })()`);
-if (!res.src || !res.src.includes('labibookings.setmore.com')) fail.push('booking iframe missing or wrong src: ' + res.src);
-else if (res.h < 400) fail.push('booking iframe only ' + res.h + 'px tall');
-else if (!res.fallback || !res.fallback.includes('setmore.com')) fail.push('no direct-link fallback for the booking frame');
-else if (res.overflow) fail.push('reservation page overflows horizontally');
-else ok.push('booking iframe embedded (' + res.h + 'px) with a direct-link fallback');
+await goto(BASE + '/');
+await click('.figure__swap', 1000);
+check(await evaluate(`[...document.querySelectorAll('.shot')]
+  .findIndex(s => s.classList.contains('is-on')) === 1`),
+  'the photo swap works on mobile too', 'the photo did not swap on mobile');
+await shot('m-home-photo2');
 
-/* --------------------------------------------------------------- mobile --- */
+/* The booking page on a phone. */
+await goto(BASE + '/reservation.html');
+const mBooking = await evaluate(`(() => ({
+  live: !!document.querySelector('#booking.is-live'),
+  overflow: document.documentElement.scrollWidth - 390,
+  rows: document.querySelectorAll('.step[data-step="2"] .item--pick').length
+}))()`);
+check(mBooking.live, 'the booking interface mounts on mobile', 'booking UI missing on mobile');
+check(mBooking.overflow <= 0, 'the booking page has no horizontal overflow at 390px',
+  'booking page overflows by ' + mBooking.overflow + 'px');
+check(mBooking.rows === 12, 'all 12 services are reachable on mobile',
+  mBooking.rows + ' services on mobile');
 
-await load(BASE + '/', 390, 844, true);
-if (errorsNow().length) fail.push(`mobile console: ${errorsNow().join(' | ')}`);
+await click('.step[data-step="1"] .item--pick:nth-of-type(1)', 400);
+check(await evaluate(`document.querySelectorAll('.step[data-step="2"] .item--pick.is-off').length === 4`),
+  'the exclusion works on mobile as well',
+  'mobile exclusion disabled '
+  + await evaluate(`document.querySelectorAll('.step[data-step="2"] .item--pick.is-off').length`)
+  + ' services, expected 4');
+await shot('m-booking');
 
-for (const sec of SECTIONS) {
-  await ev(`(() => { const n = document.getElementById('main-navigation-mobile');
-    if (!n.classList.contains('open')) document.getElementById('ico-nav').click(); })()`);
-  await new Promise((r) => setTimeout(r, 250));
-  await ev(`document.querySelector('#main-navigation-mobile [data-sec="${sec}"]').click()`);
-  await new Promise((r) => setTimeout(r, 900));
-  await shot(`m-${sec}.png`);
-  const s = await ev(`(() => { const s = document.getElementById('${sec}');
-    const r = s.getBoundingClientRect();
-    return { active: s.classList.contains('is-active'), h: Math.round(r.height),
-      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-      menuClosed: !document.getElementById('main-navigation-mobile').classList.contains('open'),
-      logoW: Math.round(document.querySelector('.head__mark img').getBoundingClientRect().width) }; })()`);
-  if (!s.active) fail.push(`mobile: #${sec} did not activate`);
-  else if (s.overflow) fail.push(`mobile: #${sec} causes horizontal overflow`);
-  else if (!s.menuClosed) fail.push(`mobile: menu stayed open after choosing ${sec}`);
-  else if (s.logoW < 90) fail.push('mobile: logo is only ' + s.logoW + 'px wide - the lockup sub-line will not read');
-  else ok.push(`mobile #${sec} renders (${s.h}px), menu closes, no overflow`);
-}
+/* -------------------------------------------------------- no-script ----- */
+await send('Emulation.setScriptExecutionDisabled', { value: true });
+await viewport(1440, 900);
+await goto(BASE + '/reservation.html');
+const noJs = await evaluate.name && await (async () => {
+  const { result } = await send('Runtime.evaluate', {
+    expression: `document.querySelectorAll('#booking .item').length + '|'
+      + /10:00-22:00/.test(document.body.innerText) + '|'
+      + /45/.test(document.body.innerText)`, returnByValue: true });
+  return result.value;
+})();
+const [rowCount, hasHours, hasPrice] = String(noJs).split('|');
+check(Number(rowCount) >= 19, 'without JavaScript the full price list and hours are still there ('
+  + rowCount + ' rows)', 'no-JS fallback is missing rows: ' + rowCount);
+check(hasHours === 'true' && hasPrice === 'true',
+  'the no-JavaScript page still states the hours and the prices',
+  'no-JS fallback lost the hours or the prices');
+await send('Emulation.setScriptExecutionDisabled', { value: false });
 
-await ev(`document.getElementById('ico-nav').click()`);
-await new Promise((r) => setTimeout(r, 400));
-await shot('m-menu.png');
-const menu = await ev(`(() => { const n = document.getElementById('main-navigation-mobile');
-  const cs = getComputedStyle(n); const li = getComputedStyle(n.querySelector('li'));
-  return { open: n.classList.contains('open'), bg: cs.backgroundColor, liSize: li.fontSize,
-    burgerX: document.getElementById('ico-nav').classList.contains('open') }; })()`);
-if (menu.bg !== 'rgb(136, 136, 136)') fail.push(`mobile menu ground should be #888888, got ${menu.bg}`);
-if (!menu.burgerX) fail.push('burger did not switch to its X state');
-if (!fail.some((f) => f.includes('menu'))) ok.push(`mobile menu opens on #888888, li ${menu.liSize}, burger becomes X`);
-
-await load(BASE + '/reservation.html', 390, 844, true);
-await shot('m-reservation.png');
-const resM = await ev('document.documentElement.scrollWidth > document.documentElement.clientWidth');
-if (resM) fail.push('reservation page overflows horizontally on mobile');
-else ok.push('reservation page fits at 390px');
-
-/* --------------------------------------------------------------- report --- */
-
-ws.close();
-chrome.kill();
+/* ====================================================================== */
+ws.close(); chrome.kill();
 await rm(profile, { recursive: true, force: true }).catch(() => {});
 
-console.log(ok.map((o) => '  ok   ' + o).join('\n'));
+console.log(pass.map(p => '  ok   ' + p).join('\n'));
 if (fail.length) {
-  console.error(`\n${fail.length} FAILED:\n` + fail.map((f) => '  x  ' + f).join('\n'));
+  console.error('\n' + fail.length + ' FAILED:\n' + fail.map(f => '  x  ' + f).join('\n'));
   process.exit(1);
 }
-console.log(`\nall checks passed against ${BASE}`);
+console.log('\nall ' + pass.length + ' checks passed against ' + BASE);

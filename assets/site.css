@@ -1,23 +1,24 @@
 /*
-  KIRU — ISU-STYLE PREVIEW
+  JILL SCUTT — ISU-STYLE PREVIEW
   ========================
 
   A pitch mockup reproducing the page composition and interaction model of
-  isu-antwerp.com with the KIRU lockup and a portrait from joruhairstudio.
+  isu-antwerp.com with the JILL SCUTT wordmark and two portraits that
+  cross-fade on tap.
 
   NOTE ON CONTENT: the address, phone, email, Instagram, opening hours and
-  embedded Setmore booking page are Labi's real details, used as stand-in
-  filler at the client's request. They are live and they reach Labi, not KIRU. Swap them before this
-  goes anywhere near a real audience.
+  inbox the booking form writes to are Labi's real details, used as stand-in
+  filler at the client's request. They are live and they reach Labi, not JILL
+  SCUTT. Swap them before this goes anywhere near a real audience.
 
   Every value here was measured off the live ISU site (its source HTML, its
   css/style.css, and computed styles read in the browser) on 2026-08-17 —
   none of it is eyeballed:
 
     header        absolute, top 50px / right 100px, right-aligned. The slot is
-                  wider than ISU's 145px because the KIRU lockup carries the
-                  wordmark, rule, tagline and kanji in one image, where ISU
-                  splits the mark and the tagline into separate elements
+                  wider than ISU's 145px because the JILL SCUTT lockup is a
+                  9.09:1 wordmark-plus-rule in one image, where ISU splits the
+                  mark and the tagline into separate elements
     home figure   3:2 rather than ISU's 634/358 - see the note at #home .figure
     nav           absolute, bottom 80px / left 100px, Bebas Neue 22px;
                   li margin-bottom 6px, line-height 20px, float + clear;
@@ -114,7 +115,9 @@ a { color: inherit; text-decoration: none; }
   position: absolute;
   top: 50px;
   right: 100px;
-  max-width: 300px;
+  max-width: 340px;   /* the JILL SCUTT lockup is 782x86 - 9.09:1, far wider
+                         than the mark it replaced, so the slot widens to keep
+                         the letterforms at a readable size */
   text-align: right;
   z-index: 900;
 }
@@ -151,6 +154,51 @@ a { color: inherit; text-decoration: none; }
   object-fit: cover;   /* frame matches the source ratio, so this crops nothing */
   object-position: 50% 50%;
   display: block;
+}
+
+/*
+  Two photographs occupying one frame. Both are 3:4 and both are absolutely
+  positioned in the same box, so the cross-fade moves no layout at all - the
+  frame's height is fixed by its aspect-ratio whichever photo is showing.
+
+  The swap target is a real <button> filling the frame, so it is reachable by
+  keyboard and announces the photograph it moved to.
+*/
+#home .figure__swap {
+  display: block;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+}
+#home .shot {
+  position: absolute;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.75s var(--ease2);
+}
+#home .shot.is-on { opacity: 1; }
+#home .shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* A quiet instruction, in the same register as the preview flag. It sits under
+   the frame rather than over the photograph so nothing is obscured. */
+.figure__cue {
+  margin: 14px auto 0;
+  text-align: center;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--grey);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #home .shot { transition: none; }
 }
 
 /* -------------------------------------------------------------- #intro ---- */
@@ -348,31 +396,235 @@ a { color: inherit; text-decoration: none; }
 /* --------------------------------------------------- reservation page ----- */
 
 .reservation #main-content { display: grid; place-items: center; }
-#reservation-box { width: 500px; margin: 0 auto; padding: 40px 0 30px; }
+#reservation-box { width: 560px; margin: 0 auto; padding: 40px 0 30px; }
 #reservation-box .box { padding-top: 0; }
 
-.reserve-cta {
-  display: block;
-  width: max-content;
-  margin: 34px auto 0;
+/* ==========================================================================
+   BOOKING
+   ==========================================================================
+
+   Built out of the same two pieces the rest of the site is made of: the 500px
+   column with the 6px rule down its middle, and Bebas at 22/22. A booking form
+   arriving in its own visual language would read as a widget dropped into the
+   page, which is exactly what this replaces.
+   ========================================================================== */
+
+.step { margin: 0 0 4px; }
+
+/* Steps 3, 4 and 5 stay shut until the step before them is answered. The
+   max-height is a ceiling, not a measurement - it only has to exceed the
+   tallest the panel can get, and the eased opacity is what the eye actually
+   reads, so the height is never seen arriving at a wrong value. */
+.step[data-step="3"],
+.step[data-step="4"],
+.step[data-step="5"] {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: max-height 0.55s var(--ease2),
+              opacity 0.40s var(--ease2);
+}
+.step.is-open {
+  max-height: 1600px;
+  opacity: 1;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.step__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  margin: 40px 0 6px;
   font-family: var(--display);
   font-size: 22px;
   line-height: 22px;
-  color: var(--paper);
-  background: var(--ink);
-  padding: 9px 26px;
-  white-space: nowrap;
+  font-weight: normal;
 }
-.reserve-cta:hover { background: var(--grey); }
+.step__n { color: var(--grey); }
+.step__t { letter-spacing: 0.02em; }
 
-.reserve-note {
-  margin: 22px auto 0;
-  max-width: 420px;
+.step__hint {
+  margin: 14px auto 0;
+  max-width: 460px;
+  text-align: center;
+  font-family: var(--text);
+  font-size: 15px;
+  line-height: 19px;
+  color: var(--grey);
+}
+.step__hint.legend {
+  margin-left: auto;
+  white-space: normal;
+}
+
+/* ------------------------------------------------------- pickable rows --- */
+
+/*
+  A row is a real <button>, so it is tabbable and announces its pressed state.
+  The reset has to be thorough: a button brings its own font, padding, border
+  and background, any one of which would break the lockup.
+*/
+.item--pick {
+  display: block;
+  width: 100%;
+  margin: 0 0 5px;
+  padding: 3px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.28s var(--ease2);
+}
+.item--pick .desc,
+.item--pick .value { transition: color 0.28s var(--ease2); }
+.item--pick:hover:not(.is-off) .desc,
+.item--pick:hover:not(.is-off) .value { color: var(--grey); }
+
+/* Chosen: the row inverts and paints over the centre rule, so the selection
+   reads as one solid bar rather than two halves that happen to be dark. */
+.item--pick.is-picked { background: var(--ink); }
+.item--pick.is-picked .desc,
+.item--pick.is-picked .value { color: var(--paper); }
+
+/* Excluded by the other axis: Labi with a colour service, or a colour service
+   with Labi. Greyed rather than hidden - someone who came in for balayage
+   should see that it exists and that it is Donovan's, not be handed a shorter
+   list with no explanation. */
+.item--pick.is-off { cursor: not-allowed; }
+.item--pick.is-off .desc,
+.item--pick.is-off .value,
+.item--pick.is-off:hover .desc,
+.item--pick.is-off:hover .value { color: #c9c9c9; }
+
+/* ------------------------------------------------------- days and times -- */
+
+.strip, .grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
+}
+.chip {
+  border: 1px solid var(--ink);
+  background: none;
+  color: var(--ink);
+  font-family: var(--display);
+  cursor: pointer;
+  padding: 8px 10px;
+  line-height: 1;
+  transition: background-color 0.28s var(--ease2), color 0.28s var(--ease2);
+}
+.chip:hover, .chip.is-picked { background: var(--ink); color: var(--paper); }
+
+.chip--day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 58px;
+}
+.chip__dow { font-size: 13px; color: var(--grey); transition: color 0.28s var(--ease2); }
+.chip--day:hover .chip__dow,
+.chip--day.is-picked .chip__dow { color: var(--paper); }
+.chip__num { font-size: 24px; }
+.chip__mon { font-size: 13px; }
+.chip--time { font-size: 18px; min-width: 62px; }
+
+/* -------------------------------------------------------------- details -- */
+
+.bform { max-width: 460px; margin: 18px auto 0; }
+.bfield { display: block; margin-bottom: 14px; }
+.bfield__l {
+  display: block;
+  margin-bottom: 5px;
+  font-family: var(--display);
+  font-size: 16px;
+  line-height: 16px;
+  color: var(--grey);
+}
+.bfield input,
+.bfield textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--text);
+  font-size: 16px;
+  line-height: 20px;
+  transition: border-color 0.28s var(--ease2);
+}
+.bfield textarea { resize: vertical; }
+.bfield input:focus,
+.bfield textarea:focus { outline: none; border-color: var(--grey); }
+
+.bsummary {
+  margin: 18px 0 14px;
+  padding: 12px 14px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--text);
+  font-size: 15px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.bsubmit {
+  display: block;
+  width: 100%;
+  padding: 12px 26px;
+  border: 0;
+  border-radius: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 22px;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.28s var(--ease2);
+}
+.bsubmit:hover { background: var(--grey); }
+.bnote { margin-top: 12px; }
+
+/* The confirmation that replaces the form once the request is composed. */
+.bdone { max-width: 460px; margin: 18px auto 0; text-align: center; }
+.bdone__h { font-family: var(--display); font-size: 22px; line-height: 22px; margin-bottom: 8px; }
+.bdone__p { font-family: var(--text); font-size: 16px; line-height: 20px; margin-bottom: 14px; }
+.bdone__pre {
+  text-align: left;
+  margin: 0 0 16px;
+  padding: 14px;
+  border: 1px solid var(--ink);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 18px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.reserve-fallback {
+  margin: 34px auto 0;
   text-align: center;
   font-family: var(--text);
   font-size: 16px;
   line-height: 19px;
-  color: var(--ink);
+}
+.reserve-fallback a { text-decoration: underline; text-underline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .step, .item--pick, .chip, .bsubmit, .bfield input, .bfield textarea,
+  .chip__dow, .item--pick .desc, .item--pick .value { transition: none !important; }
 }
 
 #main-footer {
@@ -395,7 +647,7 @@ a { color: inherit; text-decoration: none; }
   #main-navigation { display: none; }
 
   /* ISU hides the tagline entirely on mobile — only the mark remains. */
-  .head { top: 34px; right: 7.5%; max-width: 46vw; }
+  .head { top: 34px; right: 7.5%; max-width: 62vw; }
 
   #main-content {
     min-height: 0;
@@ -403,10 +655,16 @@ a { color: inherit; text-decoration: none; }
     padding: 150px 0 60px;
   }
 
-  /* The photo runs full-bleed at its natural ratio, as ISU's does. */
-  /* Full bleed at the photo's own 3:4 - no crop at all on a phone either. */
-  #home .figure { width: 100%; height: auto; aspect-ratio: auto; }
-  #home .figure img { height: auto; object-fit: fill; }
+  /*
+    Full bleed at the photographs' own 3:4 - no crop on a phone either.
+
+    The aspect-ratio has to STAY here. Both photographs are absolutely
+    positioned so they can cross-fade in place, which leaves the frame with no
+    child to take its height from; releasing the ratio collapses the whole
+    section to the height of the caption underneath it.
+  */
+  #home .figure { width: 100%; height: auto; aspect-ratio: 1440 / 1920; }
+  #home .shot img { height: 100%; object-fit: cover; }
 
   #intro .content { width: 80%; }
 
@@ -447,11 +705,17 @@ a { color: inherit; text-decoration: none; }
      .tapa-trazo  0.85s  scaleX 1 -> 0, origin right, ease2, at t+1.00
      h2 .cov      0.65s  scaleX 1 -> 0, origin right, ease1, at t+1.60
 
-   The KIRU lockup is a single image where ISU's is four layered pieces, so the
-   covers here are positioned over its four ink regions, measured off the actual
-   file: wordmark y 5-91 / x 10-324, rule y 128-133, tagline and kanji sharing
-   y 171-357 but separated horizontally at about x 600 of 880.
-   ========================================================================== */
+   The JILL SCUTT lockup is one image where ISU's is four layered pieces, so
+   the covers sit over its two ink regions. Measured off the shipped 782x86
+   file by scanning its alpha channel row by row:
+
+     wordmark  y 17.44% - 70.93%,  x 2.05% - 47.44%
+     rule      y 77.91% - 82.56%,  x 1.92% - 98.08%
+
+   The covers below are set slightly outside those bounds so no hairline of
+   ink is left showing at the start of the wipe. There are two beats here
+   rather than ISU's four because there are two marks, not four.
+========================================================================== */
 
 .tapa {
   position: absolute;
@@ -463,11 +727,9 @@ a { color: inherit; text-decoration: none; }
 }
 .head__mark { position: relative; }
 
-/* Measured regions of the 880x363 lockup, as percentages. */
-.tapa--word  { left: 0;    top: 0;   width: 43%;  height: 31%; }
-.tapa--line  { left: 0;    top: 31%; width: 101%; height: 9%; }
-.tapa--tag   { left: 27%;  top: 40%; width: 42%;  height: 32%; }
-.tapa--kanji { left: 67%;  top: 40%; width: 35%;  height: 61%; }
+/* Measured regions of the 782x86 lockup, as percentages. */
+.tapa--word { left: 0; top: 14%; width: 50%;  height: 59%; }
+.tapa--line { left: 0; top: 75%; width: 101%; height: 11%; }
 
 /* The hero carries one cover, as ISU's #home figure .tapa does. */
 #home .figure .tapa { left: 0; top: 0; width: 101%; height: 101%; }
@@ -478,17 +740,17 @@ a { color: inherit; text-decoration: none; }
 .js .is-revealed .tapa,
 .js .tapa.is-revealed { transform: scaleX(0); }
 
-.js .head .tapa--word  { transition-duration: 0.85s; transition-delay: 0.70s; }
-.js .head .tapa--line  { transition-duration: 1.15s; transition-delay: 0s; }
-.js .head .tapa--kanji { transition-duration: 0.85s; transition-delay: 1.00s; }
-.js .head .tapa--tag   { transition-duration: 0.65s; transition-delay: 1.60s;
-                         transition-timing-function: var(--ease1); }
+/* ISU's own numbers: the rule draws first and longest, the wordmark follows
+   it out. Their third and fourth beats have nothing to uncover here. */
+.js .head .tapa--line { transition-duration: 1.15s; transition-delay: 0s; }
+.js .head .tapa--word { transition-duration: 0.85s; transition-delay: 0.70s;
+                        transition-timing-function: var(--ease1); }
 #home .figure .tapa    { transition-duration: 1.15s; transition-delay: 0.35s; }
 
 /* The nav arrives last, on ease1 like ISU's final beat. */
 .js #main-navigation { opacity: 0; transform: translateY(6px); }
 .js #main-navigation {
-  transition: opacity 0.65s var(--ease1) 1.75s, transform 0.65s var(--ease1) 1.75s;
+  transition: opacity 0.65s var(--ease1) 1.25s, transform 0.65s var(--ease1) 1.25s;
 }
 .js .is-revealed #main-navigation { opacity: 1; transform: none; }
 
@@ -577,34 +839,4 @@ a { color: inherit; text-decoration: none; }
   #curtain { display: none; }
 }
 
-/* ------------------------------------------------------------- booking --- */
-
-/*
-  The embedded Setmore frame. Given a generous fixed height rather than being
-  asked to auto-size: it is cross-origin, so its content height cannot be read
-  and there is no way to fit it to its own content without Setmore posting a
-  message out. 820px clears the service list and the calendar step on desktop.
-*/
-.booking {
-  width: min(560px, 100%);
-  margin: 0 auto;
-}
-.booking__frame {
-  display: block;
-  width: 100%;
-  height: 820px;
-  border: 0;
-}
-.reserve-fallback {
-  margin: 18px auto 0;
-  text-align: center;
-  font-family: var(--text);
-  font-size: 16px;
-  line-height: 19px;
-}
-.reserve-fallback a { text-decoration: underline; text-underline-offset: 3px; }
-
-@media (max-width: 759px) {
-  .booking { width: 100%; }
-  .booking__frame { height: 760px; }
 }

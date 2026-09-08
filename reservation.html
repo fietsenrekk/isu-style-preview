@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KIRU — make a reservation</title>
-<meta name="description" content="KIRU — make a reservation. A visual-direction preview.">
+<title>JILL SCUTT — reservation</title>
+<meta name="description" content="JILL SCUTT — book a chair. A visual-direction preview.">
 <meta name="robots" content="noindex, nofollow">
 <!--
   PREVIEW / PITCH MOCKUP — not a live business site.
@@ -13,16 +13,41 @@
   lockup, a centred booking panel, and a footer carrying the address, the email
   and the Instagram handle.
 
-  ISU drops a third-party booking widget straight into an iframe on this page,
-  and so does this. The frame is the real Setmore booking page, so availability,
-  services, durations and prices are live and every booking lands in the owner's
-  Setmore calendar the instant it is made - nothing to sync, no backend, and the
-  visitor never leaves the site. See the note above the iframe for the two
-  caveats that come with it.
+  ---------------------------------------------------------------------------
+  WHAT ISU ACTUALLY USES, AND WHY THIS PAGE IS NOT A COPY OF IT
+  ---------------------------------------------------------------------------
+
+  ISU's reservation page is one iframe pointing at onlineafspraken.nl, a Dutch
+  booking platform. Their embed, verbatim from their source:
+
+    https://widget.onlineafspraken.nl/consumer/booking/book
+      /key/kknn71uwff77-acff71   <- ISU's OWN account identifier
+      /at/0 /rs/0                <- appointment type / resource, 0 = let the
+                                    visitor choose
+      /ln/1                      <- language
+      /l/11121 /t/94             <- location and template
+      /f/e0c000e                 <- feature flags
+      /c/00aeef,7dc473,111111,00aeef,56ac4a,ffffff,0   <- widget colours
+      /s/500_1500                <- min/max size
+      /o/theme:gray,interval:week
+      /output/html
+
+  It responds `x-frame-options: ALLOWALL`, so it does embed cross-origin — that
+  part is not the obstacle. The obstacle is `key`: it names ISU's diary.
+  Embedding it here would send Jill Scutt's customers into ISU's calendar.
+  There is no version of that which is acceptable, and restyling the colours
+  does not change whose bookings they are.
+
+  So this page implements the booking itself, in the site's own typography,
+  and keeps a provider adapter (assets/booking-provider.js) as the single seam
+  where a real planner is wired in once the salon has an account of its own.
+  The whole of the interface — the Labi/Donovan exclusion, the price list, the
+  slot calculation around the afternoon break — is provider-independent and
+  survives that swap untouched.
 
   The address, email and Instagram handle in the footer are Labi's real ones,
-  used as stand-in filler under the KIRU name by request. They are live and they
-  reach Labi.
+  used as stand-in filler under the JILL SCUTT name by request. They are live
+  and they reach Labi.
 -->
 <link rel="icon" href="assets/favicon.png" type="image/png">
 <link rel="stylesheet" href="assets/site.css">
@@ -39,13 +64,11 @@
     <h1 class="head__title">
       <a class="head__mark" href="index.html">
         <picture>
-          <source type="image/webp" srcset="assets/brand/kiru-logo.webp">
-          <img src="assets/brand/kiru-logo.png" width="880" height="363" alt="KIRU — hair by night">
+          <source type="image/webp" srcset="assets/brand/jillscutt-logo.webp">
+          <img src="assets/brand/jillscutt-logo.png" width="1000" height="200" alt="JILL SCUTT">
         </picture>
-          <span class="tapa tapa--word" aria-hidden="true"></span>
-          <span class="tapa tapa--line" aria-hidden="true"></span>
-          <span class="tapa tapa--tag" aria-hidden="true"></span>
-          <span class="tapa tapa--kanji" aria-hidden="true"></span>
+        <span class="tapa tapa--word" aria-hidden="true"></span>
+        <span class="tapa tapa--line" aria-hidden="true"></span>
       </a>
     </h1>
   </header>
@@ -54,34 +77,54 @@
     <section id="reservation-box" aria-label="Make a reservation">
 
       <!--
-        The real Setmore booking page, embedded.
-
-        Setmore sends no X-Frame-Options and no frame-ancestors directive, so
-        the booking page can be framed cross-origin - verified by loading it in
-        a frame and confirming the flow renders, not assumed from the docs. It
-        IS Setmore, so availability, services and prices are live and every
-        booking lands in the owner's Setmore calendar the moment it is made.
-        Nothing to sync, no backend, and the visitor never leaves the site.
-
-        Two honest caveats, both the account owner's to settle:
-          - the frame renders in whatever theme the Setmore account is set to
-            (currently dark, against this paper page). Setmore > Booking Page >
-            appearance changes it.
-          - Setmore loads its own analytics and shows its own cookie notice
-            inside the frame. That is why the zero-third-party claim in the
-            README is scoped to every page except this one.
+        The interactive booking replaces the contents of #booking on load. What
+        is written inside it is the no-JavaScript fallback: the complete price
+        list and the opening hours, in the same lockup the rest of the site
+        uses, plus the phone number. A visitor without scripts still learns
+        every price and can still book — by telephone, which is how this salon
+        was booked before it had a website.
       -->
-      <div class="booking">
-        <iframe
-          class="booking__frame"
-          src="https://labibookings.setmore.com/labibookings"
-          title="Book an appointment"
-          loading="lazy"
-          referrerpolicy="no-referrer-when-downgrade"></iframe>
+      <div id="booking">
+
+        <noscript>
+          <p class="step__hint">Booking needs JavaScript. The full price list and
+          the opening hours are below — or call <a href="tel:+32468562324">+32 468 56 23 24</a>.</p>
+        </noscript>
+
+        <div class="box">
+          <span class="rule" aria-hidden="true"></span>
+          <div class="item"><p class="desc">Men's cut</p><p class="value">from 45</p></div>
+          <div class="item"><p class="desc">Women's cut</p><p class="value">45</p></div>
+          <div class="item"><p class="desc">Women's cut + dry</p><p class="value">55</p></div>
+          <div class="item"><p class="desc">Women's cut + blow-dry</p><p class="value">65</p></div>
+          <div class="item"><p class="desc">Half-head highlights</p><p class="value">70</p></div>
+          <div class="item"><p class="desc">Full-head highlights</p><p class="value">100</p></div>
+          <div class="item"><p class="desc">Regrowth colour</p><p class="value">50</p></div>
+          <div class="item"><p class="desc">Regrowth + ends and lengths</p><p class="value">70</p></div>
+          <div class="item"><p class="desc">Balayage</p><p class="value">from 160</p></div>
+          <div class="item"><p class="desc">Toner</p><p class="value">from 45</p></div>
+          <div class="item"><p class="desc">Wash</p><p class="value">7.50</p></div>
+          <div class="item"><p class="desc">Wash + blow-dry</p><p class="value">from 40</p></div>
+          <p class="legend">All prices in euro. Highlights, balayage and toner are Donovan's.</p>
+        </div>
+
+        <div class="box">
+          <span class="rule" aria-hidden="true"></span>
+          <div class="item"><p class="desc">MON</p><p class="value">10:00-22:00</p></div>
+          <div class="item"><p class="desc">TUE</p><p class="value">10:00-22:00</p></div>
+          <div class="item"><p class="desc">WED</p><p class="value">10:00-22:00</p></div>
+          <div class="item"><p class="desc">THU</p><p class="value">10:00-22:00</p></div>
+          <div class="item"><p class="desc">FRI</p><p class="value">10:00-22:00</p></div>
+          <div class="item"><p class="desc">SAT</p><p class="value">/</p></div>
+          <div class="item"><p class="desc">SUN</p><p class="value">/</p></div>
+          <p class="legend">Closed for a break 14:00-15:00.</p>
+        </div>
+
       </div>
 
       <p class="reserve-fallback">
-        Trouble with the form? <a href="https://labibookings.setmore.com/labibookings" target="_blank" rel="noopener noreferrer">Open the booking page directly</a>.
+        Rather speak to someone? Call <a href="tel:+32468562324">+32 468 56 23 24</a>
+        or e-mail <a href="mailto:alabivof@gmail.com">alabivof@gmail.com</a>.
       </p>
 
     </section>
@@ -95,6 +138,10 @@
 
 </div>
 
+<script src="assets/booking-data.js"></script>
+<script src="assets/booking-core.js"></script>
+<script src="assets/booking-provider.js"></script>
+<script src="assets/booking-ui.js"></script>
 <script>
 (function () {
   var root = document.documentElement;
