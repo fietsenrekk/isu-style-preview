@@ -119,26 +119,28 @@ ok('tomorrow is unaffected by today\'s clock',
    Core.slotsFor(SHOP, new Date(2026, 8, 10), 30, now)[0] === '10:00');
 
 console.log('\nstaff <-> service exclusion');
-/* All colour work is Donovan's: both highlights, balayage, toner and both
-   regrowth services. Labi has the cuts, the washes and the blow-dries. */
-const donovanOnly = ['half-head-highlights', 'full-head-highlights', 'balayage',
-                     'toner', 'uitgroei', 'uitgroei-lengtes'];
+/* Donovan does everything. Labi does the three that need no colour. */
+const donovanOnly = ['highlights', 'balayage', 'roots', 'kleuring', 'toner'];
 for (const id of donovanOnly) {
   ok('Labi cannot do ' + id, Core.canDo(SHOP, 'labi', id) === false);
   ok('Donovan can do ' + id, Core.canDo(SHOP, 'donovan', id) === true);
 }
-check('Labi offers 5 of the 11 services', Core.servicesFor(SHOP, 'labi').length, 5);
-check('Labi has the cuts and the washes and nothing else',
-      Core.servicesFor(SHOP, 'labi').map(s => s.group).sort(),
-      ['cut', 'cut', 'cut', 'wash', 'wash']);
-check('Donovan offers all 11', Core.servicesFor(SHOP, 'donovan').length, 11);
-check('no stylist chosen shows all 11', Core.servicesFor(SHOP, null).length, 11);
-check('balayage is Donovan only', Core.staffFor(SHOP, 'balayage').map(s => s.id), ['donovan']);
+check('Labi offers 3 of the 8 services', Core.servicesFor(SHOP, 'labi').length, 3);
+check('Labi has exactly the cut, the wash and the blow-dry',
+      Core.servicesFor(SHOP, 'labi').map(s => s.id).sort(),
+      ['blowdry', 'knippen', 'wassen']);
+check('Donovan offers all 8', Core.servicesFor(SHOP, 'donovan').length, 8);
+check('no stylist chosen shows all 8', Core.servicesFor(SHOP, null).length, 8);
 check('a cut is both', Core.staffFor(SHOP, 'knippen').map(s => s.id), ['labi', 'donovan']);
-check('regrowth is Donovan only', Core.staffFor(SHOP, 'uitgroei').map(s => s.id), ['donovan']);
-check('regrowth + lengths is Donovan only',
-      Core.staffFor(SHOP, 'uitgroei-lengtes').map(s => s.id), ['donovan']);
+check('a blow-dry is both', Core.staffFor(SHOP, 'blowdry').map(s => s.id), ['labi', 'donovan']);
+check('a wash is both', Core.staffFor(SHOP, 'wassen').map(s => s.id), ['labi', 'donovan']);
+check('balayage is Donovan only', Core.staffFor(SHOP, 'balayage').map(s => s.id), ['donovan']);
+check('roots is Donovan only', Core.staffFor(SHOP, 'roots').map(s => s.id), ['donovan']);
+check('colour is Donovan only', Core.staffFor(SHOP, 'kleuring').map(s => s.id), ['donovan']);
 check('no service chosen shows both', Core.staffFor(SHOP, null).length, 2);
+ok('every service Labi cannot do is a colour service or the toner',
+   SHOP.services.filter(s => !s.staff.includes('labi'))
+     .every(s => s.group === 'colour' || s.group === 'toner'));
 ok('the two directions agree for every pair',
    SHOP.services.every(sv =>
      SHOP.staff.every(st =>
@@ -146,6 +148,10 @@ ok('the two directions agree for every pair',
          === (Core.servicesFor(SHOP, st.id).some(x => x.id === sv.id))
          && Core.canDo(SHOP, st.id, sv.id)
          === (Core.staffFor(SHOP, sv.id).some(x => x.id === st.id)))));
+check('both stylists carry the same title',
+      SHOP.staff.map(s => s.role), ['Hairstylist', 'Hairstylist']);
+ok('no title implies a hierarchy between them',
+   !SHOP.staff.some(s => /partner|senior|junior|owner|assistant/i.test(s.role)));
 
 console.log('\nbookable days');
 const days = Core.bookableDays(SHOP, 30, WED, 5);
@@ -168,7 +174,7 @@ check('weekend rows are closed', rows.filter(r => !r.open).map(r => r.label), ['
 check('break label', Core.breakLabel(SHOP), '14:00-15:00');
 ok('every published open day actually yields slots',
    rows.filter(r => r.open).every(r => {
-     let probe = new Date(2026, 8, 7);                   // a Monday
+     let probe = new Date(2026, 8, 7);
      while (probe.getDay() !== r.dow) probe = Core.addDays(probe, 1);
      return Core.slotsFor(SHOP, probe, 30, null).length > 0;
    }));
@@ -179,22 +185,23 @@ ok('every published closed day yields none',
      return Core.slotsFor(SHOP, probe, 30, null).length === 0;
    }));
 
-console.log('\nprice list matches the owner\'s written list');
+console.log("\nprice list matches the owner's written list");
+/* Cuts 35+ · Highlights 60+ · Balayage 160+ · Wash 7,50 · Toner 45+
+   Blow dry 35+ · Roots 50+ · Colour 50+ */
 const expectedPrices = {
-  'knippen': [35, true],
-  'knippen-drogen': [55, false], 'knippen-blowdry': [65, false],
-  'half-head-highlights': [70, false], 'full-head-highlights': [100, false],
-  'uitgroei': [50, false], 'uitgroei-lengtes': [70, false],
-  'balayage': [160, true], 'toner': [45, true],
-  'wassen': [7.5, false], 'wassen-blowdry': [40, true]
+  'knippen': [35, true], 'blowdry': [35, true], 'wassen': [7.5, false],
+  'highlights': [60, true], 'balayage': [160, true], 'roots': [50, true],
+  'kleuring': [50, true], 'toner': [45, true]
 };
-check('all 11 services present', SHOP.services.length, 11);
+check('all 8 services present', SHOP.services.length, 8);
 for (const [id, [price, from]] of Object.entries(expectedPrices)) {
   const sv = Core.service(SHOP, id);
   ok(id + ' = ' + price + (from ? ' (from)' : ''),
      sv && sv.price === price && sv.from === from,
      sv ? 'got ' + sv.price + ' from=' + sv.from : 'service missing');
 }
+check('the wash is the only fixed price',
+      SHOP.services.filter(s => !s.from).map(s => s.id), ['wassen']);
 ok('every service has a positive duration',
    SHOP.services.every(s => s.minutes > 0 && s.minutes <= 240));
 ok('every service is doable by at least one stylist',
@@ -203,20 +210,30 @@ ok('every service duration fits inside a working day',
    SHOP.services.every(s => Core.slotsFor(SHOP, WED, s.minutes, null).length > 0));
 
 console.log('\ncombining services');
-/* Same group = alternatives to one another, different groups = combinable. */
 check('every service has a group', SHOP.services.every(s => !!s.group), true);
-ok('two cuts cannot be booked together',
-   Core.clashes(SHOP, ['knippen'], 'knippen-blowdry'));
-ok('two colour processes cannot be booked together',
-   Core.clashes(SHOP, ['balayage'], 'full-head-highlights'));
-ok('regrowth clashes with balayage — both are colour',
-   Core.clashes(SHOP, ['uitgroei'], 'balayage'));
-ok('two washes cannot be booked together',
-   Core.clashes(SHOP, ['wassen'], 'wassen-blowdry'));
-ok('a cut and a colour DO go together',
-   !Core.clashes(SHOP, ['knippen'], 'balayage'));
-ok('a cut, a colour, a toner and a wash all go together',
-   !Core.clashes(SHOP, ['knippen', 'balayage', 'toner'], 'wassen'));
+check('the four colour processes share one group',
+      SHOP.services.filter(s => s.group === 'colour').map(s => s.id),
+      ['highlights', 'balayage', 'roots', 'kleuring']);
+ok('highlights and balayage cannot both be booked',
+   Core.clashes(SHOP, ['highlights'], 'balayage'));
+ok('roots and a full colour cannot both be booked',
+   Core.clashes(SHOP, ['roots'], 'kleuring'));
+ok('balayage and roots cannot both be booked',
+   Core.clashes(SHOP, ['balayage'], 'roots'));
+ok('every pair of colour processes clashes', (() => {
+  const col = SHOP.services.filter(s => s.group === 'colour').map(s => s.id);
+  return col.every(a => col.filter(b => b !== a).every(b => Core.clashes(SHOP, [a], b)));
+})());
+/* The three colourless services are independent of each other and of colour. */
+ok('a cut and a wash go together', !Core.clashes(SHOP, ['knippen'], 'wassen'));
+ok('a cut and a blow-dry go together', !Core.clashes(SHOP, ['knippen'], 'blowdry'));
+ok('a wash and a blow-dry go together', !Core.clashes(SHOP, ['wassen'], 'blowdry'));
+ok('a cut and a colour go together', !Core.clashes(SHOP, ['knippen'], 'balayage'));
+ok('a whole visit goes together: cut, wash, blow-dry, colour, toner',
+   !Core.clashes(SHOP, ['knippen', 'wassen', 'blowdry', 'balayage'], 'toner'));
+ok('a toner sits on top of any colour process',
+   SHOP.services.filter(s => s.group === 'colour')
+     .every(s => !Core.clashes(SHOP, [s.id], 'toner')));
 ok('a service never clashes with itself (so it stays removable)',
    Core.canAdd(SHOP, ['balayage'], 'balayage'));
 ok('nothing clashes with an empty set',
@@ -227,10 +244,13 @@ ok('clashing is symmetric', SHOP.services.every(a => SHOP.services.every(b =>
 console.log('\nwho can take a whole set');
 check('a cut alone: both stylists', Core.staffForSet(SHOP, ['knippen']).map(s => s.id),
       ['labi', 'donovan']);
+check('cut + wash + blow-dry: still both',
+      Core.staffForSet(SHOP, ['knippen', 'wassen', 'blowdry']).map(s => s.id),
+      ['labi', 'donovan']);
 check('cut + balayage: Donovan only',
       Core.staffForSet(SHOP, ['knippen', 'balayage']).map(s => s.id), ['donovan']);
-check('cut + wash: still both',
-      Core.staffForSet(SHOP, ['knippen', 'wassen']).map(s => s.id), ['labi', 'donovan']);
+check('a toner pulls the booking to Donovan',
+      Core.staffForSet(SHOP, ['wassen', 'toner']).map(s => s.id), ['donovan']);
 check('the empty set rules nobody out', Core.staffForSet(SHOP, []).length, 2);
 ok('every combinable set has at least one stylist who can take it',
    SHOP.services.every(a => SHOP.services.every(b =>
@@ -239,27 +259,35 @@ ok('canDoAll agrees with staffForSet for every pair',
    SHOP.services.every(a => SHOP.services.every(b => SHOP.staff.every(p =>
      Core.canDoAll(SHOP, p.id, [a.id, b.id])
        === Core.staffForSet(SHOP, [a.id, b.id]).some(x => x.id === p.id)))));
+ok("Labi can take every set drawn only from Labi's own services", (() => {
+  const his = Core.servicesFor(SHOP, 'labi').map(s => s.id);
+  return Core.canDoAll(SHOP, 'labi', his);
+})());
 
 console.log('\ntotals for a set');
 check('duration sums', Core.totalMinutes(SHOP, ['knippen', 'wassen']), 60);
 check('an empty set is zero minutes', Core.totalMinutes(SHOP, []), 0);
 /* 35 (a floor) + 7.50 = 42.50, and the floor carries into the total. */
 check('price sums', Core.totalPriceLabel(SHOP, ['knippen', 'wassen']), 'from 42.50');
-/* One floor price makes the whole total a floor: 160+ and 45 cannot add to a
-   fixed 205, because the balayage half can still move. */
 check('one "from" makes the total a "from"',
       Core.totalPriceLabel(SHOP, ['balayage', 'knippen']), 'from 195');
-check('all-fixed stays fixed',
-      Core.totalPriceLabel(SHOP, ['knippen-drogen', 'full-head-highlights']), '155');
+/* The wash is the only fixed price on the list, so it is the only set that can
+   be quoted exactly. */
+check('the one fixed price stays fixed', Core.totalPriceLabel(SHOP, ['wassen']), '7.50');
 check('an empty set has no price', Core.totalPriceLabel(SHOP, []), '');
+ok('any set containing a floor price is quoted as a floor',
+   SHOP.services.filter(s => s.from)
+     .every(s => Core.totalPriceLabel(SHOP, [s.id, 'wassen']).startsWith('from ')));
 
 console.log('\nlong combinations still fit a day');
-/* The longest legal booking: one cut, one colour, a toner and a wash. */
-const longest = ['knippen-blowdry', 'balayage', 'toner', 'wassen-blowdry'];
+/* The longest legal booking: everything that can be held at once, with the
+   longest colour process. */
+const longest = ['knippen', 'blowdry', 'wassen', 'balayage', 'toner'];
 ok('the longest legal combination is internally consistent',
    longest.every((id, i) => !Core.clashes(SHOP, longest.slice(0, i), id)));
 const longMins = Core.totalMinutes(SHOP, longest);
 ok('the longest combination is ' + longMins + ' minutes', longMins > 0);
+ok('one stylist can take all of it', Core.staffForSet(SHOP, longest).length >= 1);
 ok('and it still has slots on a working day',
    Core.slotsFor(SHOP, WED, longMins, null).length > 0,
    'no slot fits ' + longMins + ' minutes');
@@ -317,13 +345,15 @@ for (const file of SHIPPED) {
   });
   ok('no gendered wording in ' + file, hits.length === 0, hits.join('\n         '));
 }
-check('there are three cutting entries and none names a gender',
-      SHOP.services.filter(s => s.group === 'cut').map(s => s.name),
-      ['Cut', 'Cut + dry', 'Cut + blow-dry']);
+check('one cutting entry, and it names no gender',
+      SHOP.services.filter(s => s.group === 'cut').map(s => s.name), ['Cuts']);
 check('the Dutch names are genderless too',
-      SHOP.services.filter(s => s.group === 'cut').map(s => s.nl),
-      ['Knippen', 'Knippen + drogen', 'Knippen + blowdry']);
+      SHOP.services.map(s => s.nl),
+      ['Knippen', 'Blowdrogen', 'Wassen', 'Highlights', 'Balayage', 'Uitgroei',
+       'Kleuring', 'Toner']);
 check('a cut starts at 35', Core.priceLabel(Core.service(SHOP, 'knippen')), 'from 35');
+check('a blow-dry starts at 35', Core.priceLabel(Core.service(SHOP, 'blowdry')), 'from 35');
+check('highlights start at 60', Core.priceLabel(Core.service(SHOP, 'highlights')), 'from 60');
 ok('every price the site can print is free of gendered wording',
    SHOP.services.every(s => !BANNED.some(re => re.test(s.name) || re.test(s.nl) || re.test(s.id))));
 

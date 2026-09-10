@@ -287,6 +287,18 @@ check(await evaluate(`[...document.querySelectorAll('.shot')]
 check(await evaluate(`getComputedStyle(document.querySelector('.shot')).transition.includes('opacity')`),
   'the swap is an eased cross-fade, not a cut', 'the photo swap has no transition');
 
+/* The homepage nav sits bottom-left against a centred figure. */
+await goto(BASE + '/');
+const navClash = await evaluate(`(() => {
+  const n = document.getElementById('main-navigation');
+  const f = document.querySelector('#home .figure');
+  const x = n.getBoundingClientRect(), y = f.getBoundingClientRect();
+  return { hit: x.left < y.right && x.right > y.left && x.top < y.bottom && x.bottom > y.top,
+           nav: [Math.round(x.right)], fig: [Math.round(y.left)] };
+})()`);
+check(navClash.hit === false, 'the nav and the photograph do not overlap',
+  'nav overlaps the figure: ' + JSON.stringify(navClash));
+
 /* =================================================== the booking page === */
 await goto(BASE + '/reservation.html');
 await shot('d-reservation');
@@ -307,18 +319,50 @@ const prices = await evaluate(`(() => {
   return { rows, data };
 })()`);
 check(JSON.stringify(prices.rows) === JSON.stringify(prices.data),
-  'all 11 services are listed with the price beside each option',
+  'all 8 services are listed with the price beside each option',
   'service list differs from the data:\n     ' + JSON.stringify(prices.rows));
-check(prices.rows.length === 11, '11 services shown', prices.rows.length + ' services shown');
+check(prices.rows.length === 8, '8 services shown', prices.rows.length + ' services shown');
 check(prices.rows.some(r => r[1] === 'from 160'),
   'balayage shows as a "from" price, not a fixed one',
   'balayage price label is wrong: ' + JSON.stringify(prices.rows.find(r => /Balayage/.test(r[0]))));
 check(prices.rows.some(r => r[1] === '7.50'), 'the 7.50 wash keeps its cents',
   'wash price is ' + JSON.stringify(prices.rows.find(r => /Wash$/.test(r[0]))));
 
+/* --- nothing on the page sits on top of anything else ------------------ */
+
+/*
+  The booking column is centred in the viewport while the footer is absolutely
+  positioned at the bottom of it, so a short service list leaves the two free
+  to occupy the same pixels. Nothing overflows and nothing is clipped when that
+  happens - the text simply prints over the address - which is why neither of
+  those checks caught it when the list went from twelve rows to eight.
+*/
+async function overlaps(a, b) {
+  return await evaluate(`(() => {
+    const A = document.querySelector(${JSON.stringify(a)});
+    const B = document.querySelector(${JSON.stringify(b)});
+    if (!A || !B) return { missing: true };
+    const x = A.getBoundingClientRect(), y = B.getBoundingClientRect();
+    const hit = x.left < y.right && x.right > y.left && x.top < y.bottom && x.bottom > y.top;
+    return { hit, a: [Math.round(x.top), Math.round(x.bottom)],
+             b: [Math.round(y.top), Math.round(y.bottom)] };
+  })()`);
+}
+
+for (const [a, b, label] of [
+  ['#reservation-box', '#main-footer', 'the booking column and the footer'],
+  ['.reserve-fallback', '#main-footer', 'the fallback line and the footer'],
+  ['#reservation-box', '.head', 'the booking column and the wordmark']
+]) {
+  const r = await overlaps(a, b);
+  check(!r.missing && r.hit === false,
+    label + ' do not overlap',
+    label + ' overlap: ' + JSON.stringify(r));
+}
+
 /* --- the exclusion, both directions, in the live DOM ------------------- */
-const DONOVAN_ONLY = ['half-head-highlights', 'full-head-highlights', 'balayage',
-                      'toner', 'uitgroei', 'uitgroei-lengtes'];
+/* Donovan does everything; Labi does the cut, the wash and the blow-dry. */
+const DONOVAN_ONLY = ['highlights', 'balayage', 'roots', 'kleuring', 'toner'];
 
 /* Direction 1: choose Labi, the four colour services must go dead. */
 await click('.step[data-step="1"] .item--pick:nth-of-type(1)');
@@ -333,11 +377,11 @@ const afterLabi = await evaluate(`(() => {
 })()`);
 check(afterLabi.picked === 'LABI', 'LABI can be selected', 'LABI did not select');
 check(DONOVAN_ONLY.every(id => afterLabi.services[id].off && afterLabi.services[id].disabled),
-  'choosing LABI disables all six colour services',
+  'choosing LABI disables the four colour processes and the toner',
   'exclusion failed: ' + JSON.stringify(DONOVAN_ONLY.map(id => [id, afterLabi.services[id]])));
 check(Object.entries(afterLabi.services)
   .filter(([id]) => !DONOVAN_ONLY.includes(id)).every(([, v]) => !v.off),
-  'choosing LABI leaves her other 6 services selectable',
+  'choosing LABI leaves the cut, the wash and the blow-dry selectable',
   'too much was disabled: ' + JSON.stringify(afterLabi.services));
 await shot('d-booking-labi');
 
@@ -387,18 +431,17 @@ const multi = await evaluate(`(() => {
     times: [...document.querySelectorAll('.step[data-step="4"] .chip--time')].length };
 })()`);
 check(multi.picked.length === 2 && multi.picked.includes('Balayage')
-      && multi.picked.includes('Cut'),
+      && multi.picked.includes('Cuts'),
   'a cut and a colour can be booked together',
   'selection is ' + JSON.stringify(multi.picked));
-check(multi.off.includes('Cut + dry') && multi.off.includes('Cut + blow-dry'),
-  'the other two cutting options go dead — a cut is a cut, not three',
-  'other cuts were not excluded: ' + JSON.stringify(multi.off));
-check(multi.off.includes('Full-head highlights') && multi.off.includes('Regrowth colour'),
-  'the other colour processes go dead too — one colour per visit',
+check(multi.off.includes('Highlights') && multi.off.includes('Roots')
+      && multi.off.includes('Colour'),
+  'the other three colour processes go dead — one colour per visit',
   'other colour services were not excluded: ' + JSON.stringify(multi.off));
-check(!multi.off.includes('Wash') && !multi.off.includes('Toner'),
-  'a wash and a toner remain addable on top',
-  'wash or toner was wrongly excluded: ' + JSON.stringify(multi.off));
+check(!multi.off.includes('Wash') && !multi.off.includes('Blow dry')
+      && !multi.off.includes('Toner'),
+  'the wash, the blow-dry and the toner remain addable on top',
+  'something combinable was wrongly excluded: ' + JSON.stringify(multi.off));
 /* 160 (from) + 35 (from) = 195, quoted as a floor because both halves can move. */
 check(/from 195/.test(multi.total) && /225 minutes/.test(multi.total),
   'the running total sums the prices and the time (' + multi.total + ')',
@@ -408,13 +451,16 @@ await shot('d-booking-multi');
 /* Removing the cut must restore what it excluded. */
 await click(`.step[data-step="2"] .item--pick:nth-of-type(${cutIdx + 1})`);
 const afterRemove = await evaluate(`(() => ({
-  picked: document.querySelectorAll('.step[data-step="2"] .is-picked').length,
-  cutsOff: [...document.querySelectorAll('.step[data-step="2"] .item--pick')]
+  picked: [...document.querySelectorAll('.step[data-step="2"] .is-picked')]
+    .map(b => b.querySelector('.desc').textContent.trim()),
+  off: [...document.querySelectorAll('.step[data-step="2"] .item--pick')]
     .filter(b => b.classList.contains('is-off'))
     .map(b => b.querySelector('.desc').textContent.trim())
-    .filter(t => /cut/i.test(t)).length
 }))()`);
-check(afterRemove.picked === 1 && afterRemove.cutsOff === 0,
+/* Balayage alone: the three other colour processes stay excluded, the cut does
+   not — removing the cut has to give the cut back. */
+check(JSON.stringify(afterRemove.picked) === JSON.stringify(['Balayage'])
+      && !afterRemove.off.includes('Cuts'),
   'removing a service releases everything it was excluding',
   'after removal: ' + JSON.stringify(afterRemove));
 
@@ -503,10 +549,31 @@ check(genderless.length === 0,
 const cutRows = await evaluate(`[...document.querySelectorAll('.step[data-step="2"] .item--pick')]
   .map(b => [b.querySelector('.desc').textContent.trim(), b.querySelector('.value').textContent.trim()])
   .filter(r => /^Cut/.test(r[0]))`);
-check(JSON.stringify(cutRows) === JSON.stringify(
-        [['Cut', 'from 35'], ['Cut + dry', '55'], ['Cut + blow-dry', '65']]),
-  'the cutting list reads Cut from 35 / + dry 55 / + blow-dry 65',
+check(JSON.stringify(cutRows) === JSON.stringify([['Cuts', 'from 35']]),
+  'there is one cutting row and it reads Cuts / from 35',
   'cutting rows are ' + JSON.stringify(cutRows));
+
+/* The whole list, against the data, in order. */
+const wholeList = await evaluate(`(() => {
+  const rows = [...document.querySelectorAll('.step[data-step="2"] .item--pick')]
+    .map(b => [b.querySelector('.desc').textContent.trim(),
+               b.querySelector('.value').textContent.trim()]);
+  return { rows, data: SHOP.services.map(s => [s.name, BookingCore.priceLabel(s)]) };
+})()`);
+check(JSON.stringify(wholeList.rows) === JSON.stringify([
+        ['Cuts', 'from 35'], ['Blow dry', 'from 35'], ['Wash', '7.50'],
+        ['Highlights', 'from 60'], ['Balayage', 'from 160'], ['Roots', 'from 50'],
+        ['Colour', 'from 50'], ['Toner', 'from 45']]),
+  'the eight prices on the page are the eight the owner gave',
+  'the list reads ' + JSON.stringify(wholeList.rows));
+
+/* Both stylists are titled the same, with no hierarchy implied. */
+const roles = await evaluate(`[...document.querySelectorAll('.step[data-step="1"] .item--pick')]
+  .map(b => [b.querySelector('.desc').textContent.trim(),
+             b.querySelector('.value').textContent.trim()])`);
+check(JSON.stringify(roles) === JSON.stringify([['LABI', 'Hairstylist'], ['DONOVAN', 'Hairstylist']]),
+  'both stylists are listed as Hairstylist',
+  'stylist rows are ' + JSON.stringify(roles));
 
 /* The form must refuse to submit empty. */
 const guarded = await evaluate(`(() => {
@@ -565,15 +632,15 @@ const mBooking = await evaluate(`(() => ({
 check(mBooking.live, 'the booking interface mounts on mobile', 'booking UI missing on mobile');
 check(mBooking.overflow <= 0, 'the booking page has no horizontal overflow at 390px',
   'booking page overflows by ' + mBooking.overflow + 'px');
-check(mBooking.rows === 11, 'all 11 services are reachable on mobile',
+check(mBooking.rows === 8, 'all 8 services are reachable on mobile',
   mBooking.rows + ' services on mobile');
 
 await click('.step[data-step="1"] .item--pick:nth-of-type(1)', 400);
-check(await evaluate(`document.querySelectorAll('.step[data-step="2"] .item--pick.is-off').length === 6`),
+check(await evaluate(`document.querySelectorAll('.step[data-step="2"] .item--pick.is-off').length === 5`),
   'the exclusion works on mobile as well',
   'mobile exclusion disabled '
   + await evaluate(`document.querySelectorAll('.step[data-step="2"] .item--pick.is-off').length`)
-  + ' services, expected 6');
+  + ' services, expected 5');
 await shot('m-booking');
 
 /* -------------------------------------------------------- no-script ----- */
@@ -604,9 +671,9 @@ const noJs = await evaluate(`document.querySelectorAll('#booking .item').length 
   + !!document.querySelector('#booking.is-live')`);
 const [rowCount, hasHours, hasPrice, wentLive] = String(noJs).split('|');
 
-check(Number(rowCount) === 13,
-  'without JavaScript all 11 prices and the 2 hours rows are still there',
-  'no-JS fallback has ' + rowCount + ' rows, expected 13');
+check(Number(rowCount) === 10,
+  'without JavaScript all 8 prices and the 2 hours rows are still there',
+  'no-JS fallback has ' + rowCount + ' rows, expected 10');
 check(hasHours === 'true' && hasPrice === 'true',
   'the no-JavaScript page still states the hours and the prices',
   'no-JS fallback lost the hours or the prices');

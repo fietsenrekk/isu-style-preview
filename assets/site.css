@@ -395,7 +395,19 @@ a { color: inherit; text-decoration: none; }
 
 /* --------------------------------------------------- reservation page ----- */
 
-.reservation #main-content { display: grid; place-items: center; }
+/*
+  The footer is absolutely positioned at the bottom of the page, so the centred
+  booking column has to leave room for it. Without this padding the column
+  centres against the full viewport and, on a short list, lands on top of the
+  address. That is exactly what happened when the price list went from twelve
+  rows to eight: nothing overflowed, nothing was clipped, the two simply
+  overlapped. verify.mjs now asserts they do not.
+*/
+.reservation #main-content {
+  display: grid;
+  place-items: center;
+  padding-bottom: 150px;
+}
 #reservation-box { width: 560px; margin: 0 auto; padding: 40px 0 30px; }
 #reservation-box .box { padding-top: 0; }
 
