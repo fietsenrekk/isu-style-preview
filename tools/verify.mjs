@@ -81,8 +81,28 @@ const evaluate = async (expr) => {
 };
 
 const pass = [], fail = [];
-const ok = (m) => pass.push(m);
-const no = (m) => fail.push(m);
+/*
+  Printed as they happen, not collected and printed at the end. An open
+  WebSocket keeps Node's event loop alive, so a thrown error in this file does
+  not terminate the process - it just stops making progress. Buffering the
+  output until the end turned every such failure into a silent hang with
+  nothing on stdout to say where it stopped.
+*/
+const ok = (m) => { pass.push(m); console.log('  ok   ' + m); };
+const no = (m) => { fail.push(m); console.error('  x    ' + m); };
+
+/* And make a throw end the run, loudly, with Chrome cleaned up after it. */
+function die(label) {
+  return (err) => {
+    console.error('\n' + label + ': ' + ((err && err.stack) || err));
+    console.error('stopped after ' + pass.length + ' passing checks.');
+    try { ws.close(); } catch {}
+    try { chrome.kill(); } catch {}
+    process.exit(1);
+  };
+}
+process.on('unhandledRejection', die('UNHANDLED REJECTION'));
+process.on('uncaughtException', die('UNCAUGHT EXCEPTION'));
 const check = (cond, good, bad) => cond ? ok(good) : no(bad);
 
 async function viewport(w, h, mobile = false) {
@@ -287,9 +307,9 @@ const prices = await evaluate(`(() => {
   return { rows, data };
 })()`);
 check(JSON.stringify(prices.rows) === JSON.stringify(prices.data),
-  'all 12 services are listed with the price beside each option',
+  'all 11 services are listed with the price beside each option',
   'service list differs from the data:\n     ' + JSON.stringify(prices.rows));
-check(prices.rows.length === 12, '12 services shown', prices.rows.length + ' services shown');
+check(prices.rows.length === 11, '11 services shown', prices.rows.length + ' services shown');
 check(prices.rows.some(r => r[1] === 'from 160'),
   'balayage shows as a "from" price, not a fixed one',
   'balayage price label is wrong: ' + JSON.stringify(prices.rows.find(r => /Balayage/.test(r[0]))));
@@ -352,10 +372,10 @@ check(afterBalayage.donovanPicked,
 /* --- several services in one booking ----------------------------------- */
 
 /*
-  With balayage already chosen (Donovan, 180 min), add a women's cut. They are
-  in different groups so they combine; both are Donovan's so he stays valid.
+  With balayage already chosen (Donovan, 180 min), add a cut. They are in
+  different groups so they combine; both are Donovan's so he stays valid.
 */
-const cutIdx = await evaluate(`SHOP.services.findIndex(s => s.id === 'dames-knippen')`);
+const cutIdx = await evaluate(`SHOP.services.findIndex(s => s.id === 'knippen')`);
 await click(`.step[data-step="2"] .item--pick:nth-of-type(${cutIdx + 1})`);
 const multi = await evaluate(`(() => {
   const picked = [...document.querySelectorAll('.step[data-step="2"] .is-picked')]
@@ -367,12 +387,11 @@ const multi = await evaluate(`(() => {
     times: [...document.querySelectorAll('.step[data-step="4"] .chip--time')].length };
 })()`);
 check(multi.picked.length === 2 && multi.picked.includes('Balayage')
-      && multi.picked.includes("Women's cut"),
+      && multi.picked.includes('Cut'),
   'a cut and a colour can be booked together',
   'selection is ' + JSON.stringify(multi.picked));
-check(multi.off.includes("Women's cut + dry") && multi.off.includes("Women's cut + blow-dry")
-      && multi.off.includes("Men's cut"),
-  'the other three cuts go dead — a cut is a cut, not three',
+check(multi.off.includes('Cut + dry') && multi.off.includes('Cut + blow-dry'),
+  'the other two cutting options go dead — a cut is a cut, not three',
   'other cuts were not excluded: ' + JSON.stringify(multi.off));
 check(multi.off.includes('Full-head highlights') && multi.off.includes('Regrowth colour'),
   'the other colour processes go dead too — one colour per visit',
@@ -380,8 +399,8 @@ check(multi.off.includes('Full-head highlights') && multi.off.includes('Regrowth
 check(!multi.off.includes('Wash') && !multi.off.includes('Toner'),
   'a wash and a toner remain addable on top',
   'wash or toner was wrongly excluded: ' + JSON.stringify(multi.off));
-/* 160 (from) + 45 = 205, and one floor price makes the total a floor. */
-check(/from 205/.test(multi.total) && /225 minutes/.test(multi.total),
+/* 160 (from) + 35 (from) = 195, quoted as a floor because both halves can move. */
+check(/from 195/.test(multi.total) && /225 minutes/.test(multi.total),
   'the running total sums the prices and the time (' + multi.total + ')',
   'total reads: ' + multi.total);
 await shot('d-booking-multi');
@@ -454,6 +473,41 @@ check(step5.note.length > 20, 'the form says what pressing the button will do',
   'no explanatory note under the submit button');
 await shot('d-booking-full');
 
+/* --- nothing on the rendered page names a gender ----------------------- */
+
+/*
+  The unit suite greps the source files. This checks what a visitor actually
+  sees: the full rendered text of the booking page, every button label, and the
+  title attributes that explain a disabled row - a place a gendered word could
+  hide without ever appearing in the visible copy.
+*/
+const genderless = await evaluate(`(() => {
+  const banned = /\\b(heren|dames|men'?s|women'?s|men|women|man|woman|ladies|gents|male|female)\\b/i;
+  const hits = [];
+  if (banned.test(document.body.innerText)) {
+    document.body.innerText.split('\\n').forEach(l => { if (banned.test(l)) hits.push('text: ' + l.trim()); });
+  }
+  document.querySelectorAll('[title]').forEach(n => {
+    if (banned.test(n.title)) hits.push('title: ' + n.title);
+  });
+  document.querySelectorAll('img[alt], [aria-label]').forEach(n => {
+    const v = n.getAttribute('alt') || n.getAttribute('aria-label') || '';
+    if (banned.test(v)) hits.push('label: ' + v);
+  });
+  return hits;
+})()`);
+check(genderless.length === 0,
+  'nothing on the rendered booking page names a gender',
+  'gendered wording on the page: ' + JSON.stringify(genderless));
+
+const cutRows = await evaluate(`[...document.querySelectorAll('.step[data-step="2"] .item--pick')]
+  .map(b => [b.querySelector('.desc').textContent.trim(), b.querySelector('.value').textContent.trim()])
+  .filter(r => /^Cut/.test(r[0]))`);
+check(JSON.stringify(cutRows) === JSON.stringify(
+        [['Cut', 'from 35'], ['Cut + dry', '55'], ['Cut + blow-dry', '65']]),
+  'the cutting list reads Cut from 35 / + dry 55 / + blow-dry 65',
+  'cutting rows are ' + JSON.stringify(cutRows));
+
 /* The form must refuse to submit empty. */
 const guarded = await evaluate(`(() => {
   const f = document.querySelector('.bform');
@@ -511,7 +565,7 @@ const mBooking = await evaluate(`(() => ({
 check(mBooking.live, 'the booking interface mounts on mobile', 'booking UI missing on mobile');
 check(mBooking.overflow <= 0, 'the booking page has no horizontal overflow at 390px',
   'booking page overflows by ' + mBooking.overflow + 'px');
-check(mBooking.rows === 12, 'all 12 services are reachable on mobile',
+check(mBooking.rows === 11, 'all 11 services are reachable on mobile',
   mBooking.rows + ' services on mobile');
 
 await click('.step[data-step="1"] .item--pick:nth-of-type(1)', 400);
@@ -523,30 +577,49 @@ check(await evaluate(`document.querySelectorAll('.step[data-step="2"] .item--pic
 await shot('m-booking');
 
 /* -------------------------------------------------------- no-script ----- */
+
+/*
+  With page scripts disabled, nothing in the document can resolve a promise, so
+  the usual readyState wait would never return - it is the page that would have
+  to answer. Wait on Page.loadEventFired, which comes from the browser rather
+  than from the document. Runtime.evaluate still works: it is the protocol
+  evaluating, not the page.
+*/
 await send('Emulation.setScriptExecutionDisabled', { value: true });
 await viewport(1440, 900);
-await goto(BASE + '/reservation.html');
-const noJs = await evaluate.name && await (async () => {
-  const { result } = await send('Runtime.evaluate', {
-    expression: `document.querySelectorAll('#booking .item').length + '|'
-      + /10:00-22:00/.test(document.body.innerText) + '|'
-      + /45/.test(document.body.innerText)`, returnByValue: true });
-  return result.value;
-})();
-const [rowCount, hasHours, hasPrice] = String(noJs).split('|');
-check(Number(rowCount) === 14,
-  'without JavaScript all 12 prices and the 2 hours rows are still there',
-  'no-JS fallback has ' + rowCount + ' rows, expected 14');
+
+const loaded = new Promise((resolve) => {
+  const onMessage = (e) => {
+    const m = JSON.parse(e.data);
+    if (m.method === 'Page.loadEventFired') { ws.removeEventListener('message', onMessage); resolve(); }
+  };
+  ws.addEventListener('message', onMessage);
+});
+await send('Page.navigate', { url: BASE + '/reservation.html' });
+await Promise.race([loaded, new Promise(r => setTimeout(r, 8000))]);
+
+const noJs = await evaluate(`document.querySelectorAll('#booking .item').length + '|'
+  + /10:00-22:00/.test(document.body.innerText) + '|'
+  + /from 35/.test(document.body.innerText) + '|'
+  + !!document.querySelector('#booking.is-live')`);
+const [rowCount, hasHours, hasPrice, wentLive] = String(noJs).split('|');
+
+check(Number(rowCount) === 13,
+  'without JavaScript all 11 prices and the 2 hours rows are still there',
+  'no-JS fallback has ' + rowCount + ' rows, expected 13');
 check(hasHours === 'true' && hasPrice === 'true',
   'the no-JavaScript page still states the hours and the prices',
   'no-JS fallback lost the hours or the prices');
+check(wentLive === 'false',
+  'and the interactive booking correctly did not mount',
+  'the booking UI claims to be live with scripts disabled');
+
 await send('Emulation.setScriptExecutionDisabled', { value: false });
 
 /* ====================================================================== */
 ws.close(); chrome.kill();
 await rm(profile, { recursive: true, force: true }).catch(() => {});
 
-console.log(pass.map(p => '  ok   ' + p).join('\n'));
 if (fail.length) {
   console.error('\n' + fail.length + ' FAILED:\n' + fail.map(f => '  x  ' + f).join('\n'));
   process.exit(1);

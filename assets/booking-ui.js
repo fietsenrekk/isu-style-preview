@@ -184,7 +184,8 @@
 
     body.appendChild(el('p', 'step__hint legend',
       'Pick as many as go together — a cut, a colour and a wash are one visit. '
-      + 'All prices in euro; "from" prices depend on hair length and the work it takes.'));
+      + 'One list for everyone: prices are in euro and follow the length of your '
+      + 'hair and the work it takes.'));
   })();
 
   /* ------------------------------------------------------------- step 3 --- */

@@ -27,7 +27,10 @@ shown anywhere it could be mistaken for real contact information.
 
 The reservation page implements the booking itself, in the site's own
 typography, rather than embedding a third-party widget. Four choices —
-stylist, service, day, time — then a details form.
+stylist, services, day, time — then a details form. Services are a set, not
+one item: a cut and a colour and a wash are one visit, while two ways of
+pricing the same cut are not, which is what the `group` field on each service
+expresses.
 
 **Why not the widget ISU uses.** ISU's reservation page is a single iframe
 pointing at **onlineafspraken.nl**. It does embed cross-origin
@@ -57,6 +60,15 @@ salon by e-mail. The button says *request* and the confirmation says the salon
 confirms, because until a person or a real diary answers, that is what has
 happened.
 
+## The price list is genderless
+
+By instruction. There is one cutting entry, from 35, priced by the length of
+the hair and the work it takes rather than by who is in the chair. No label,
+no Dutch `nl` string, no fallback row and no line of copy may reintroduce the
+split — `booking-test.mjs` greps every shipped file for gendered wording, and
+`verify.mjs` checks the rendered page including `title` and `aria-label`
+attributes, where such a word could hide without being visible.
+
 ## Data
 
 `assets/booking-data.js` is the single source of truth for hours, staff and
@@ -65,7 +77,9 @@ and the slot calculator all read from it, so they cannot drift apart.
 
 Three values in it are **assumptions, not supplied facts**, and are flagged as
 such in the file: the exact hour of the one-hour afternoon break (14:00–15:00),
-the per-service durations, and the 60-minute same-day lead time.
+the per-service durations (including the 45 minutes now reserved for a cut,
+which replaced two entries carrying 30 and 45), and the 60-minute same-day
+lead time.
 
 ## Assets
 
@@ -101,8 +115,9 @@ node tools/verify.mjs
 node tools/motion-check.mjs
 ```
 
-`booking-test.mjs` is 78 unit tests over the slot calculator and the price
-list, in Node, with no browser. The slot maths is the one part of this site
+`booking-test.mjs` is 127 unit tests over the slot calculator, the service
+combinations and the price list, in Node, with no browser. It also greps every
+shipped file for gendered wording and fails if any reappears. The slot maths is the one part of this site
 that can be quietly wrong — it always renders *a* list of times, and a list of
 times looks correct no matter which ones are missing — so the expected counts
 were worked out by hand before the code was run.

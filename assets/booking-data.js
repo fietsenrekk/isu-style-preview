@@ -12,20 +12,33 @@
   PROVENANCE — read before changing anything
   ---------------------------------------------------------------------------
 
-  PRICES are transcribed from the owner's own price list (WhatsApp, 16 Jul).
-  Transcribed verbatim, Dutch original kept in `nl` on every entry so nothing
-  is lost in translation:
+  PRICES come from the owner's own price list (WhatsApp, 16 Jul), with the
+  cutting prices later revised by the owner. Dutch kept in `nl` on every entry
+  so nothing is lost in translation:
 
-      Heren knippen v.a 45          Dames knippen 45
-      Dames knippen drogen 55       Dames knippen blowdry 65
+      Knippen v.a 35                Knippen + drogen 55
+      Knippen + blowdry 65
       Half head highlights 70       Fullhead highlights 100
       Uitgroei 50                   Uitgroei + punten en lengtes 70
       Balayage va 160               Toner va 45
       Wassen 7.50                   Wassen blowdry va 40
 
-  "v.a" / "va" is Dutch for "vanaf" — from. Those four carry `from: true` and
-  render as "from 45", not "45", because quoting a floor price as a fixed price
-  is the kind of error that ends in an argument at the counter.
+  "v.a" / "va" is Dutch for "vanaf" — from. Those entries carry `from: true`
+  and render as "from 35", not "35", because quoting a floor price as a fixed
+  price is the kind of error that ends in an argument at the counter.
+
+  ---------------------------------------------------------------------------
+  THE PRICE LIST IS GENDERLESS, BY INSTRUCTION
+  ---------------------------------------------------------------------------
+
+  The written list split the cuts in two by gender and priced both at 45. The
+  owner has replaced that with a single cut from 35: one list, priced by the
+  length of the hair and the work it takes, not by who is sitting in the chair.
+
+  Nothing on this site may reintroduce that split — not a label, not an `nl`
+  string, not the e-mail the booking form composes, not a comment. There are
+  three cutting entries now and none of them names a gender. A test greps the
+  whole repository for those words and fails if any reappears.
 
   HOURS are the owner's: Monday to Friday 10:00-22:00, closed Saturday and
   Sunday, with a one-hour rest break in the middle of the day.
@@ -38,11 +51,11 @@
   COMBINATIONS. Services can be booked together. What cannot be combined is
   expressed by `group`: two services sharing a group are alternatives to one
   another and are mutually exclusive, services in different groups combine
-  freely. So a cut and a colour and a wash go together, but a women's cut and a
-  women's cut with a blow-dry do not — they are the same appointment priced two
-  ways, and offering both at once would sell the cut twice.
+  freely. So a cut and a colour and a wash go together, but a cut and a cut
+  with a blow-dry do not — they are the same appointment priced two ways, and
+  offering both at once would sell the cut twice.
 
-      cut     the four cutting options
+      cut     the three cutting options
       colour  the five colour services — one colour process per visit
       wash    wash, or wash with a blow-dry
       toner   on its own, because a toner is a finishing step that genuinely
@@ -125,34 +138,32 @@ window.SHOP = {
   */
 
   services: [
+    /* --- cutting: one list, no gender ------------------------------------ */
     {
-      id: 'heren-knippen',
-      name: "Men's cut",
-      nl: 'Heren knippen',
-      price: 45, from: true, minutes: 30,
+      id: 'knippen',
+      /* 45 minutes rather than the 30 the shorter of the two old entries
+         carried. A genderless cut priced from 35 covers everything from a
+         clipper cut to long layers, and the calendar has to reserve for the
+         longer end - under-booking a chair overruns into the next client,
+         over-booking it only leaves the stylist a gap. ASSUMPTION 2. */
+      name: 'Cut',
+      nl: 'Knippen',
+      price: 35, from: true, minutes: 45,
       group: 'cut',
       staff: ['labi', 'donovan']
     },
     {
-      id: 'dames-knippen',
-      name: "Women's cut",
-      nl: 'Dames knippen',
-      price: 45, from: false, minutes: 45,
-      group: 'cut',
-      staff: ['labi', 'donovan']
-    },
-    {
-      id: 'dames-knippen-drogen',
-      name: "Women's cut + dry",
-      nl: 'Dames knippen drogen',
+      id: 'knippen-drogen',
+      name: 'Cut + dry',
+      nl: 'Knippen + drogen',
       price: 55, from: false, minutes: 60,
       group: 'cut',
       staff: ['labi', 'donovan']
     },
     {
-      id: 'dames-knippen-blowdry',
-      name: "Women's cut + blow-dry",
-      nl: 'Dames knippen blowdry',
+      id: 'knippen-blowdry',
+      name: 'Cut + blow-dry',
+      nl: 'Knippen + blowdry',
       price: 65, from: false, minutes: 60,
       group: 'cut',
       staff: ['labi', 'donovan']

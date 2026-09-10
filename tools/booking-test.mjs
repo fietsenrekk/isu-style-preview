@@ -127,14 +127,14 @@ for (const id of donovanOnly) {
   ok('Labi cannot do ' + id, Core.canDo(SHOP, 'labi', id) === false);
   ok('Donovan can do ' + id, Core.canDo(SHOP, 'donovan', id) === true);
 }
-check('Labi offers 6 of the 12 services', Core.servicesFor(SHOP, 'labi').length, 6);
+check('Labi offers 5 of the 11 services', Core.servicesFor(SHOP, 'labi').length, 5);
 check('Labi has the cuts and the washes and nothing else',
       Core.servicesFor(SHOP, 'labi').map(s => s.group).sort(),
-      ['cut', 'cut', 'cut', 'cut', 'wash', 'wash']);
-check('Donovan offers all 12', Core.servicesFor(SHOP, 'donovan').length, 12);
-check('no stylist chosen shows all 12', Core.servicesFor(SHOP, null).length, 12);
+      ['cut', 'cut', 'cut', 'wash', 'wash']);
+check('Donovan offers all 11', Core.servicesFor(SHOP, 'donovan').length, 11);
+check('no stylist chosen shows all 11', Core.servicesFor(SHOP, null).length, 11);
 check('balayage is Donovan only', Core.staffFor(SHOP, 'balayage').map(s => s.id), ['donovan']);
-check("men's cut is both", Core.staffFor(SHOP, 'heren-knippen').map(s => s.id), ['labi', 'donovan']);
+check('a cut is both', Core.staffFor(SHOP, 'knippen').map(s => s.id), ['labi', 'donovan']);
 check('regrowth is Donovan only', Core.staffFor(SHOP, 'uitgroei').map(s => s.id), ['donovan']);
 check('regrowth + lengths is Donovan only',
       Core.staffFor(SHOP, 'uitgroei-lengtes').map(s => s.id), ['donovan']);
@@ -181,14 +181,14 @@ ok('every published closed day yields none',
 
 console.log('\nprice list matches the owner\'s written list');
 const expectedPrices = {
-  'heren-knippen': [45, true], 'dames-knippen': [45, false],
-  'dames-knippen-drogen': [55, false], 'dames-knippen-blowdry': [65, false],
+  'knippen': [35, true],
+  'knippen-drogen': [55, false], 'knippen-blowdry': [65, false],
   'half-head-highlights': [70, false], 'full-head-highlights': [100, false],
   'uitgroei': [50, false], 'uitgroei-lengtes': [70, false],
   'balayage': [160, true], 'toner': [45, true],
   'wassen': [7.5, false], 'wassen-blowdry': [40, true]
 };
-check('all 12 services present', SHOP.services.length, 12);
+check('all 11 services present', SHOP.services.length, 11);
 for (const [id, [price, from]] of Object.entries(expectedPrices)) {
   const sv = Core.service(SHOP, id);
   ok(id + ' = ' + price + (from ? ' (from)' : ''),
@@ -206,7 +206,7 @@ console.log('\ncombining services');
 /* Same group = alternatives to one another, different groups = combinable. */
 check('every service has a group', SHOP.services.every(s => !!s.group), true);
 ok('two cuts cannot be booked together',
-   Core.clashes(SHOP, ['dames-knippen'], 'dames-knippen-blowdry'));
+   Core.clashes(SHOP, ['knippen'], 'knippen-blowdry'));
 ok('two colour processes cannot be booked together',
    Core.clashes(SHOP, ['balayage'], 'full-head-highlights'));
 ok('regrowth clashes with balayage — both are colour',
@@ -214,9 +214,9 @@ ok('regrowth clashes with balayage — both are colour',
 ok('two washes cannot be booked together',
    Core.clashes(SHOP, ['wassen'], 'wassen-blowdry'));
 ok('a cut and a colour DO go together',
-   !Core.clashes(SHOP, ['dames-knippen'], 'balayage'));
+   !Core.clashes(SHOP, ['knippen'], 'balayage'));
 ok('a cut, a colour, a toner and a wash all go together',
-   !Core.clashes(SHOP, ['dames-knippen', 'balayage', 'toner'], 'wassen'));
+   !Core.clashes(SHOP, ['knippen', 'balayage', 'toner'], 'wassen'));
 ok('a service never clashes with itself (so it stays removable)',
    Core.canAdd(SHOP, ['balayage'], 'balayage'));
 ok('nothing clashes with an empty set',
@@ -225,12 +225,12 @@ ok('clashing is symmetric', SHOP.services.every(a => SHOP.services.every(b =>
    Core.clashes(SHOP, [a.id], b.id) === Core.clashes(SHOP, [b.id], a.id))));
 
 console.log('\nwho can take a whole set');
-check('a cut alone: both stylists', Core.staffForSet(SHOP, ['dames-knippen']).map(s => s.id),
+check('a cut alone: both stylists', Core.staffForSet(SHOP, ['knippen']).map(s => s.id),
       ['labi', 'donovan']);
 check('cut + balayage: Donovan only',
-      Core.staffForSet(SHOP, ['dames-knippen', 'balayage']).map(s => s.id), ['donovan']);
+      Core.staffForSet(SHOP, ['knippen', 'balayage']).map(s => s.id), ['donovan']);
 check('cut + wash: still both',
-      Core.staffForSet(SHOP, ['dames-knippen', 'wassen']).map(s => s.id), ['labi', 'donovan']);
+      Core.staffForSet(SHOP, ['knippen', 'wassen']).map(s => s.id), ['labi', 'donovan']);
 check('the empty set rules nobody out', Core.staffForSet(SHOP, []).length, 2);
 ok('every combinable set has at least one stylist who can take it',
    SHOP.services.every(a => SHOP.services.every(b =>
@@ -241,20 +241,21 @@ ok('canDoAll agrees with staffForSet for every pair',
        === Core.staffForSet(SHOP, [a.id, b.id]).some(x => x.id === p.id)))));
 
 console.log('\ntotals for a set');
-check('duration sums', Core.totalMinutes(SHOP, ['dames-knippen', 'wassen']), 60);
+check('duration sums', Core.totalMinutes(SHOP, ['knippen', 'wassen']), 60);
 check('an empty set is zero minutes', Core.totalMinutes(SHOP, []), 0);
-check('price sums', Core.totalPriceLabel(SHOP, ['dames-knippen', 'wassen']), '52.50');
+/* 35 (a floor) + 7.50 = 42.50, and the floor carries into the total. */
+check('price sums', Core.totalPriceLabel(SHOP, ['knippen', 'wassen']), 'from 42.50');
 /* One floor price makes the whole total a floor: 160+ and 45 cannot add to a
    fixed 205, because the balayage half can still move. */
 check('one "from" makes the total a "from"',
-      Core.totalPriceLabel(SHOP, ['balayage', 'dames-knippen']), 'from 205');
+      Core.totalPriceLabel(SHOP, ['balayage', 'knippen']), 'from 195');
 check('all-fixed stays fixed',
-      Core.totalPriceLabel(SHOP, ['dames-knippen', 'full-head-highlights']), '145');
+      Core.totalPriceLabel(SHOP, ['knippen-drogen', 'full-head-highlights']), '155');
 check('an empty set has no price', Core.totalPriceLabel(SHOP, []), '');
 
 console.log('\nlong combinations still fit a day');
 /* The longest legal booking: one cut, one colour, a toner and a wash. */
-const longest = ['dames-knippen-blowdry', 'balayage', 'toner', 'wassen-blowdry'];
+const longest = ['knippen-blowdry', 'balayage', 'toner', 'wassen-blowdry'];
 ok('the longest legal combination is internally consistent',
    longest.every((id, i) => !Core.clashes(SHOP, longest.slice(0, i), id)));
 const longMins = Core.totalMinutes(SHOP, longest);
@@ -289,6 +290,42 @@ ok('a single open day would not be written as a range', (() => {
   const s = Core.hoursSummary(one);
   return s.some(g => g.label === 'WED' && g.value === '10:00-22:00');
 })());
+
+console.log('\nthe price list is genderless');
+/*
+  The owner's instruction is that nothing on this site names a gender. That is
+  a property of every shipped file, not of one label, so it is checked as one:
+  every file the site actually serves is read and searched. A label, an `nl`
+  string, a fallback row in the HTML or a line of copy that reintroduced the
+  split would all fail here.
+
+  tools/ is excluded because this file necessarily contains the very words it
+  is searching for.
+*/
+const SHIPPED = ['index.html', 'reservation.html', 'README.md',
+                 'assets/booking-data.js', 'assets/booking-core.js',
+                 'assets/booking-provider.js', 'assets/booking-ui.js',
+                 'assets/site.css'];
+const BANNED = [/\bheren\b/i, /\bdames\b/i, /\bmen'?s\b/i, /\bwomen'?s\b/i,
+                /\bmen\b/i, /\bwomen\b/i, /\bman\b/i, /\bwoman\b/i,
+                /\bladies\b/i, /\bgents\b/i, /\bmale\b/i, /\bfemale\b/i];
+for (const file of SHIPPED) {
+  const text = readFileSync(path.join(root, file), 'utf8');
+  const hits = [];
+  text.split('\n').forEach((line, i) => {
+    BANNED.forEach(re => { if (re.test(line)) hits.push((i + 1) + ': ' + line.trim().slice(0, 70)); });
+  });
+  ok('no gendered wording in ' + file, hits.length === 0, hits.join('\n         '));
+}
+check('there are three cutting entries and none names a gender',
+      SHOP.services.filter(s => s.group === 'cut').map(s => s.name),
+      ['Cut', 'Cut + dry', 'Cut + blow-dry']);
+check('the Dutch names are genderless too',
+      SHOP.services.filter(s => s.group === 'cut').map(s => s.nl),
+      ['Knippen', 'Knippen + drogen', 'Knippen + blowdry']);
+check('a cut starts at 35', Core.priceLabel(Core.service(SHOP, 'knippen')), 'from 35');
+ok('every price the site can print is free of gendered wording',
+   SHOP.services.every(s => !BANNED.some(re => re.test(s.name) || re.test(s.nl) || re.test(s.id))));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
