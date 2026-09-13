@@ -373,14 +373,14 @@ check('the shop is called UCHI', SHOP.name, 'UCHI');
 for (const file of ['index.html', 'reservation.html']) {
   const html = readFileSync(path.join(root, file), 'utf8');
   ok(file + ' links the phone as tel:+32498803033', html.includes('href="tel:+32498803033"'));
-  ok(file + ' links info@uchi-antwerp.be', html.includes('href="mailto:info@uchi-antwerp.be"'));
+  ok(file + ' links info@uchi.be', html.includes('href="mailto:info@uchi.be"'));
   ok(file + " links Donovan's Instagram", html.includes('instagram.com/donovanhairdresser/'));
   ok(file + ' uses the UCHI wordmark', html.includes('assets/brand/uchi-logo.webp')
      && html.includes('width="648" height="183"'));
 }
 ok('the booking inbox is the domain address',
    readFileSync(path.join(root, 'assets/booking-provider.js'), 'utf8')
-     .includes("var INBOX = 'info@uchi-antwerp.be';"));
+     .includes("var INBOX = 'info@uchi.be';"));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

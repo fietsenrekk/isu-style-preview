@@ -228,8 +228,8 @@ const contact = await evaluate(`(() => {
 check(JSON.stringify(contact.tel) === JSON.stringify([['tel:+32498803033', '+32 498 80 30 33']]),
   'the phone is 0498 80 30 33, as a tappable tel: link',
   'phone links are ' + JSON.stringify(contact.tel));
-check(JSON.stringify(contact.mail) === JSON.stringify(['mailto:info@uchi-antwerp.be']),
-  'the e-mail is info@uchi-antwerp.be', 'mail links are ' + JSON.stringify(contact.mail));
+check(JSON.stringify(contact.mail) === JSON.stringify(['mailto:info@uchi.be']),
+  'the e-mail is info@uchi.be', 'mail links are ' + JSON.stringify(contact.mail));
 check(JSON.stringify(contact.ig) === JSON.stringify([
         ['https://www.instagram.com/labi_antwerp/', '@LABI_ANTWERP'],
         ['https://www.instagram.com/donovanhairdresser/', '@DONOVANHAIRDRESSER']]),

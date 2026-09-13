@@ -105,10 +105,10 @@
 window.BookingProvider = (function () {
   'use strict';
 
-  /* The salon's inbox. uchi-antwerp.be was unregistered when this was written
-     (uchi.be is taken); the mailbox does not exist until the domain is bought
-     and mail is set up, and booking requests sent here bounce until then. */
-  var INBOX = 'info@uchi-antwerp.be';
+  /* The salon's inbox, by the owner's choice. As of 2026-09-13 uchi.be is
+     still registered to a third party and publishes a null MX, so mail sent
+     here bounces until the domain is UCHI's and a mailbox exists on it. */
+  var INBOX = 'info@uchi.be';
 
   /* Shown under the submit button so the visitor knows what pressing it does
      before they press it. Read by booking-ui.js. */

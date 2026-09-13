@@ -17,23 +17,20 @@ the top of `assets/site.css`.
 
 ## ⚠ Before this goes live on its own domain
 
-1. **The domain is `uchi-antwerp.be`, not `uchi.be`.** `uchi.be` was checked on
-   2026-09-13 and is already registered to someone else (since 2023-09-28,
-   parked at one.com, publishing a null MX so it accepts no mail at all).
-   `uchi-antwerp.be` returned *domain not found* at DNS Belgium the same day —
-   unregistered — and mirrors ISU's own `isu-antwerp.com`. Register it before
-   anyone else does.
-2. **`info@uchi-antwerp.be` does not exist until the domain does.** The contact
-   section, the reservation page and the booking form all send mail there.
-   Until the domain is registered and a mailbox is set up on it, **every
-   booking request bounces**. That is the single thing that must happen before
-   the site is announced. The address is in `index.html`, `reservation.html`
-   and `assets/booking-provider.js` (`INBOX`).
-3. **Pointing the domain at GitHub Pages.** Add a `CNAME` file containing
-   `uchi-antwerp.be` to the `gh-pages` branch, set the DNS records GitHub
-   documents for apex domains, and enable HTTPS in the repository's Pages
-   settings. Do not add the `CNAME` before the DNS exists — it breaks the
-   current github.io address until it resolves.
+1. **The e-mail is `info@uchi.be`, and `uchi.be` is not UCHI's yet.** Checked
+   at DNS Belgium on 2026-09-13, twice: registered to a third party since
+   2023-09-28, parked at one.com, publishing a null MX so it accepts no mail at
+   all. The domain has to be acquired from its current holder (it cannot simply
+   be registered), then a mailbox set up on it. **Until then every booking
+   request and every e-mail from the site bounces.** The address is in
+   `index.html`, `reservation.html` and `assets/booking-provider.js` (`INBOX`).
+2. **Pointing the domain at GitHub Pages.** Once `uchi.be` is UCHI's, add a
+   `CNAME` file containing `uchi.be` to the `gh-pages` branch, set the DNS
+   records GitHub documents for apex domains, and enable HTTPS in the
+   repository's Pages settings. Do not add the `CNAME` before the DNS exists —
+   it breaks the current github.io address until it resolves.
+3. **Fallback if `uchi.be` can't be bought:** `uchi-antwerp.be` was unregistered
+   on 2026-09-13. Switching is a find-and-replace of the address.
 4. **The two homepage photographs are other people's.** The first came from
    @joruhairstudio's Instagram and the second from another Instagram post.
    They were fine for a preview; on a live commercial site they need the
@@ -47,7 +44,7 @@ the top of `assets/site.css`.
 | | |
 |---|---|
 | Phone | +32 498 80 30 33 (`tel:+32498803033`) |
-| E-mail | info@uchi-antwerp.be — see above |
+| E-mail | info@uchi.be — see above |
 | Instagram | @labi_antwerp · @donovanhairdresser |
 
 ## Booking
