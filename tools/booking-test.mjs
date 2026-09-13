@@ -376,7 +376,7 @@ for (const file of ['index.html', 'reservation.html']) {
   ok(file + ' links info@uchi-antwerp.be', html.includes('href="mailto:info@uchi-antwerp.be"'));
   ok(file + " links Donovan's Instagram", html.includes('instagram.com/donovanhairdresser/'));
   ok(file + ' uses the UCHI wordmark', html.includes('assets/brand/uchi-logo.webp')
-     && html.includes('width="648" height="186"'));
+     && html.includes('width="648" height="183"'));
 }
 ok('the booking inbox is the domain address',
    readFileSync(path.join(root, 'assets/booking-provider.js'), 'utf8')

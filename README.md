@@ -111,9 +111,12 @@ only leaves the stylist a gap.
 
 ## Assets
 
-- **Logo** — the supplied UCHI wordmark, 648×186. The source was already
-  transparent, so its own alpha is used as-is, cropped to the ink with a 2%
-  margin; WebP keeps the alpha (`yuva420p`). The reveal covers sit on its two
+- **Logo** — UCHI set in Helvetica Bold, 648×183. The letters are rendered
+  from the font file one glyph at a time so the approved letter spacing, rule
+  gap, rule thickness and rule length (measured off the earlier artwork as
+  multiples of the cap height) are kept exactly; only the typeface changed.
+  Transparent, cropped to the ink with a 2% margin; WebP keeps the alpha
+  (`yuva420p`). The reveal covers sit on its two
   ink bands, measured off the shipped file.
 - **Favicon** — the wordmark centred on `#fcfcfc`, composited in Node so the
   paper is exact.

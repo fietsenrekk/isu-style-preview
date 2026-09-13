@@ -95,8 +95,8 @@ a { color: inherit; text-decoration: none; }
   position: absolute;
   top: 50px;
   right: 100px;
-  max-width: 200px;   /* the UCHI lockup is 648x186, 3.48:1 - four heavy
-                         letters over a rule. At 200px the caps stand about
+  max-width: 200px;   /* the UCHI lockup is 648x183, 3.54:1 - four
+                         Helvetica Bold capitals over a rule. At 200px the caps stand about
                          40px tall, which reads as a mark rather than a
                          headline, in ISU's register */
   text-align: right;
@@ -724,11 +724,11 @@ a { color: inherit; text-decoration: none; }
      h2 .cov      0.65s  scaleX 1 -> 0, origin right, ease1, at t+1.60
 
    The UCHI lockup is one image where ISU's is four layered pieces, so the
-   covers sit over its two ink regions. Measured off the shipped 648x186 file
+   covers sit over its two ink regions. Measured off the shipped 648x183 file
    by scanning its alpha channel row by row:
 
-     wordmark  y  6.45% - 75.27%,  x 2.62% - 75.62%
-     rule      y 85.48% - 93.55%,  x 1.85% - 98.15%
+     wordmark  y  6.56% - 76.50%,  x 2.62% - 68.06%
+     rule      y 85.25% - 93.44%,  x 1.85% - 98.15%
 
    The covers below are set slightly outside those bounds so no hairline of
    ink is left showing at the start of the wipe. There are two beats here
@@ -745,10 +745,10 @@ a { color: inherit; text-decoration: none; }
 }
 .head__mark { position: relative; }
 
-/* Measured regions of the 648x186 lockup, as percentages. The seam between
-   the two covers sits in the clear gap at 80%. */
-.tapa--word { left: 0; top: 2%;  width: 79%;  height: 78%; }
-.tapa--line { left: 0; top: 80%; width: 101%; height: 19%; }
+/* Measured regions of the 648x183 lockup, as percentages. The seam between
+   the two covers sits in the clear gap at 81%. */
+.tapa--word { left: 0; top: 2%;  width: 72%;  height: 79%; }
+.tapa--line { left: 0; top: 81%; width: 101%; height: 18%; }
 
 /* The hero carries one cover, as ISU's #home figure .tapa does. */
 #home .figure .tapa { left: 0; top: 0; width: 101%; height: 101%; }

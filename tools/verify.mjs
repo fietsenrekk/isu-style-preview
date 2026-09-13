@@ -162,8 +162,8 @@ const logo = await evaluate(`(() => {
 })()`);
 check(logo && logo.complete && logo.w > 0, 'wordmark loaded (' + (logo && logo.nat) + ')',
   'wordmark did not load: ' + JSON.stringify(logo));
-check(logo && Math.abs((logo.w / logo.h) - 3.484) < 0.15,
-  'wordmark keeps its 3.48:1 proportion (' + (logo && (logo.w / logo.h).toFixed(2)) + ')',
+check(logo && Math.abs((logo.w / logo.h) - 3.541) < 0.15,
+  'wordmark keeps its 3.54:1 proportion (' + (logo && (logo.w / logo.h).toFixed(2)) + ')',
   'wordmark is distorted: ' + JSON.stringify(logo));
 check(logo && logo.w >= 160, 'wordmark is legible at ' + (logo && logo.w) + 'px wide',
   'wordmark is only ' + (logo && logo.w) + 'px wide');
