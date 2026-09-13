@@ -66,6 +66,9 @@
   --grey: #888;       /* ISU's nav wipe + mobile menu ground */
   --ease1: cubic-bezier(.37, 1.12, .51, .9);
   --ease2: cubic-bezier(.19, 1, .22, 1);
+  --ease-io: cubic-bezier(.76, 0, .24, 1);       /* page + menu transitions */
+  --pow1-out: cubic-bezier(.25, .46, .45, .94);  /* TweenMax default, Power1.easeOut */
+  --sine-out: cubic-bezier(.39, .575, .565, 1);  /* Sine.easeOut */
 
   --display: 'Bebas Neue', 'Arial Narrow', Arial, sans-serif;
   --text: 'Abel', Arial, sans-serif;
@@ -235,7 +238,6 @@ a { color: inherit; text-decoration: none; }
 }
 #main-navigation li {
   margin: 0 0 6px 0;
-  cursor: pointer;
   position: relative;
   color: var(--ink);
   float: left;
@@ -243,9 +245,12 @@ a { color: inherit; text-decoration: none; }
   line-height: 20px;
   white-space: nowrap;
 }
+#main-navigation a { display: block; }
 /*
   ISU's nav hover: a grey copy of the label, taken from data-text, wiping in
-  from the left over the black original.
+  from the left over the black original. ISU transitions the pseudo's width
+  (.35s ease-in); a clip-path inset gives the identical wipe without a layout
+  pass on every frame.
 */
 #main-navigation li::before {
   content: attr(data-text);
@@ -253,15 +258,13 @@ a { color: inherit; text-decoration: none; }
   left: 0;
   top: 0;
   color: var(--grey);
-  transition: width 0.35s ease-in;
-  transform-origin: left center;
-  width: 0%;
-  overflow: hidden;
   white-space: nowrap;
   pointer-events: none;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.35s ease-in;
 }
 #main-navigation li:hover::before,
-#main-navigation li.selected::before { width: 100%; }
+#main-navigation li.selected::before { clip-path: inset(0 0 0 0); }
 
 @media (prefers-reduced-motion: reduce) {
   #main-navigation li::before { transition: none; }
@@ -269,65 +272,155 @@ a { color: inherit; text-decoration: none; }
 
 /* ----------------------------------------------------------------- burger -- */
 
+/*
+  ISU's burger is 40x24 at left 7.5% / top 76px, bars 50% / 100% / 50% wide,
+  and closes to an X by animating width, left and rotate (`transition: all
+  .25s ease-in`). Here the button is a 44x44 tap target whose bars sit exactly
+  where ISU's do, and every state is a transform on a 40px bar (translate,
+  rotate, scaleX), so the change never touches layout.
+
+  Geometry (button coordinates, each bar's centre starts at 22,22):
+    closed  ln1 centre 12,12 at half length; ln2 22,22 full; ln3 32,32 half
+    open    an X centred on 14,22 (ISU's 24px box): ln2 the rising stroke at
+            .65 length, ln1 + ln3 the two halves of the falling stroke
+*/
 #ico-nav {
   display: none;
   position: absolute;
-  left: 7.5%;
-  top: 76px;
-  width: 40px;
-  height: 24px;
+  left: calc(7.5% - 2px);
+  top: 66px;
+  width: 44px;
+  height: 44px;
   z-index: 1001;
   background: none;
   border: 0;
   padding: 0;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 #ico-nav span {
-  background: var(--ink);
+  position: absolute;
+  left: 2px;
+  top: 20px;
+  width: 40px;
   height: 4px;
-  display: block;
-  position: absolute;
-  transition: all 0.25s ease-in;
+  background: var(--ink);
+  transform-origin: 50% 50%;
+  will-change: transform;
+  transition: transform 0.35s var(--ease-io);
 }
-#ico-nav .ln1 { width: 50%; top: 0; left: 0; }
-#ico-nav .ln2 { width: 100%; top: 0; bottom: 0; margin: auto 0; }
-#ico-nav .ln3 { width: 50%; bottom: 0; right: 0; }
-/* Collapses to an X, as ISU's does. */
-#ico-nav.open { width: 24px; }
-#ico-nav.open .ln1 { transform-origin: left bottom; transform: rotate(45deg); width: 55%; }
-#ico-nav.open .ln2 { transform-origin: center center; transform: rotate(-45deg); }
-#ico-nav.open .ln3 { transform-origin: right top; transform: rotate(45deg); width: 55%; left: 9px; }
+#ico-nav .ln1 { transform: translate(-10px, -10px) scaleX(.5); }
+#ico-nav .ln2 { transform: translate(0, 0) rotate(0) scaleX(1); }
+#ico-nav .ln3 { transform: translate(10px, 10px) scaleX(.5); }
+.menu-open #ico-nav { position: fixed; }
+.menu-open #ico-nav .ln1 { transform: translate(-12.6px, -4.6px) rotate(45deg) scaleX(.33); }
+.menu-open #ico-nav .ln2 { transform: translate(-8px, 0) rotate(-45deg) scaleX(.65); }
+.menu-open #ico-nav .ln3 { transform: translate(-3.4px, 4.6px) rotate(45deg) scaleX(.33); }
 
-@media (prefers-reduced-motion: reduce) {
-  #ico-nav span { transition: none; }
+/* ------------------------------------------------------------ mobile menu -- */
+
+/*
+  ISU (Navigation.js despliega / colapsa), measured:
+    open   overlay scaleX 0 -> 1, .35s ease1, origin left; then each li
+           x -15px -> 0 and opacity 0 -> 1, .45s ease1, stagger .05s
+    close  overlay opacity 1 -> 0, .35s ease1, then display none
+
+  Same beats, but never display:none -> block: the overlay is always laid out
+  and composited (will-change), hidden with visibility, so the first open costs
+  nothing more than the tenth. The grey ground is a pseudo-element, so the
+  scaleX never stretches the type and ease1's small overshoot is clipped.
+  On close the items and the ground are reset only after the fade has ended.
+*/
+#main-navigation-mobile { display: none; }
+
+@media (max-width: 759px) {
+  #main-navigation-mobile {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    overflow: hidden;
+    overscroll-behavior: contain;
+    font-family: var(--display);
+    visibility: hidden;
+    opacity: 0;
+    will-change: opacity;
+    transition: opacity 0.35s var(--ease1), visibility 0s linear 0.35s;
+  }
+  #main-navigation-mobile::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #888888;
+    transform: scaleX(0);
+    transform-origin: left center;
+    will-change: transform;
+    transition: transform 0s linear 0.35s;
+  }
+  .menu-open #main-navigation-mobile {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 0s, visibility 0s;
+  }
+  .menu-open #main-navigation-mobile::before {
+    transform: scaleX(1);
+    transition: transform 0.35s var(--ease1);
+  }
+
+  #main-navigation-mobile ul {
+    position: absolute;
+    left: 15%;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  #main-navigation-mobile li {
+    --pad: max(0px, calc((40px - 7vw) / 2));   /* keeps every row a 40px target */
+    margin: 0 0 2px 0;
+    position: relative;
+    color: var(--ink);
+    float: left;
+    clear: both;
+    font-size: 7vw;
+    line-height: 7vw;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateX(-15px);
+    will-change: transform, opacity;
+    transition: opacity 0s linear 0.35s, transform 0s linear 0.35s;
+  }
+  #main-navigation-mobile a { display: block; padding: var(--pad) 12px var(--pad) 0; }
+  /* ISU marks the current item with a #ddd copy laid over the black label. */
+  #main-navigation-mobile li::before {
+    content: attr(data-text);
+    position: absolute;
+    left: 0;
+    top: var(--pad);
+    color: #ddd;
+    pointer-events: none;
+    clip-path: inset(0 100% 0 0);
+  }
+  #main-navigation-mobile li.selected::before { clip-path: inset(0 0 0 0); }
+
+  .menu-open #main-navigation-mobile li {
+    opacity: 1;
+    transform: translateX(0);
+    transition: opacity 0.45s var(--ease1), transform 0.45s var(--ease1);
+  }
+  .menu-open #main-navigation-mobile li:nth-child(1) { transition-delay: 0.35s; }
+  .menu-open #main-navigation-mobile li:nth-child(2) { transition-delay: 0.40s; }
+  .menu-open #main-navigation-mobile li:nth-child(3) { transition-delay: 0.45s; }
+  .menu-open #main-navigation-mobile li:nth-child(4) { transition-delay: 0.50s; }
+  .menu-open #main-navigation-mobile li:nth-child(5) { transition-delay: 0.55s; }
+
+  /* Scroll lock while the menu is up. */
+  .menu-open, .menu-open body { overflow: hidden; }
 }
 
-#main-navigation-mobile {
-  display: none;
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  background: #888888;
-  font-family: var(--display);
-  z-index: 1000;
-}
-#main-navigation-mobile.open { display: block; }
-#main-navigation-mobile ul {
-  position: absolute;
-  left: 15%;
-  top: 50%;
-  transform: translateY(-50%);
-}
-#main-navigation-mobile li {
-  margin: 0 0 2px 0;
-  cursor: pointer;
-  position: relative;
-  color: var(--ink);
-  float: left;
-  clear: both;
-  font-size: 7vw;
-  line-height: 7vw;
+@media (max-width: 759px) and (prefers-reduced-motion: reduce) {
+  #main-navigation-mobile, #main-navigation-mobile::before,
+  #main-navigation-mobile li, .menu-open #main-navigation-mobile li,
+  #ico-nav span { transition: none !important; }
 }
 
 /* --------------------------------------------------- reservation page ----- */
@@ -346,6 +439,13 @@ a { color: inherit; text-decoration: none; }
   padding-bottom: 150px;
 }
 #reservation-box { width: 560px; margin: 0 auto; padding: 40px 0 30px; }
+/* Between the phone layout and ~1160px the centred 560px column reaches under
+   the top-right wordmark (its left edge sits at 100vw - 300px); start the
+   column below the lockup there, and end it above the bottom-left nav
+   (80px + four 26px rows), which it also reaches at tablet widths. */
+@media (min-width: 760px) and (max-width: 1159px) {
+  .reservation #main-content { place-items: start center; padding: 150px 0 210px; }
+}
 #reservation-box .box { padding-top: 0; }
 
 /* ==========================================================================
@@ -719,30 +819,59 @@ a { color: inherit; text-decoration: none; }
                         transition-timing-function: var(--ease1); }
 #home .figure .tapa    { transition-duration: 1.15s; transition-delay: 0.35s; }
 
-/* The nav arrives last, on ease1 like ISU's final beat. */
-.js #main-navigation { opacity: 0; transform: translateY(6px); }
-.js #main-navigation {
-  transition: opacity 0.65s var(--ease1) 1.25s, transform 0.65s var(--ease1) 1.25s;
+/* The nav arrives last, as ISU's Navigation intro: each item from x -30px and
+   opacity 0, .65s Sine.easeOut, stagger .05s. The burger fades in with it
+   (ISU: opacity .35s). */
+.js #main-navigation li {
+  opacity: 0;
+  transform: translateX(-30px);
+  transition: opacity 0.65s var(--sine-out), transform 0.65s var(--sine-out);
+  transition-delay: 1.25s;
 }
-.js .is-revealed #main-navigation { opacity: 1; transform: none; }
+.js #main-navigation li:nth-child(2) { transition-delay: 1.30s; }
+.js #main-navigation li:nth-child(3) { transition-delay: 1.35s; }
+.js #main-navigation li:nth-child(4) { transition-delay: 1.40s; }
+.js .is-revealed #main-navigation li { opacity: 1; transform: translateX(0); }
+
+.js #ico-nav { opacity: 0; transition: opacity 0.35s var(--sine-out) 1.25s; }
+.js .is-revealed #ico-nav { opacity: 1; }
+
+/*
+  If the script dies after <head>, nothing may stay hidden: every hidden-by-
+  motion element finishes on its own after 4s. Normally the transitions have
+  long ended by then and this changes nothing.
+*/
+@keyframes uchi-failsafe-cover { to { transform: scaleX(0); } }
+@keyframes uchi-failsafe-show  { to { opacity: 1; transform: none; } }
+.js .page:not(.is-revealed) .tapa { animation: uchi-failsafe-cover 1ms linear 4s forwards; }
+.js .page:not(.is-revealed) #main-navigation li,
+.js .page:not(.is-revealed) #ico-nav { animation: uchi-failsafe-show 1ms linear 4s forwards; }
 
 /* --------------------------------------------------------- the curtain --- */
 
 /*
-   ISU's page transition, from Ui.js showPreload():
-     .bck   0.85s scaleX 0 -> 1, origin left   (sweeps in)
-     wrap   0.65s scaleX 1 -> 0, origin right, at +0.90  (sweeps away)
+  One shared curtain for both kinds of transition: a section swap on home and
+  navigation between pages. ISU's Ui.js showPreload():
+    .bck   .85s scaleX 0 -> 1, origin left, ease2          (sweeps in)
+    wrap   .65s scaleX 1 -> 0, origin right, Power1.easeOut at +.9 (sweeps away)
 
-   Kept for the first paint. For a nav click the same move runs compressed, so
-   it reads as the reference site's transition without making the visitor wait
-   1.5s for a section that is already in the document.
+  Compressed to .40s in and .45s out, both on --ease-io, so leaving one page
+  and arriving on the next totals .85s of motion.
+
+  State lives on <html> so assets/js/site.js can set it from <head>, before the
+  body exists: a page always starts under `curtain-cover` (JS on, motion
+  allowed), which is what makes a flash of uncovered content impossible.
+    (none)         idle, hidden
+    curtain-cover  fully covering, no motion        arrival
+    curtain-in     .bck sweeps in from the left     leaving / swapping
+    curtain-out    the whole sheet retracts right   arriving / swapped
 */
 #curtain {
   position: fixed;
   inset: 0;
   z-index: 2000;
   pointer-events: none;
-  transform: scaleX(1);
+  visibility: hidden;
   transform-origin: right center;
 }
 #curtain .bck {
@@ -752,15 +881,19 @@ a { color: inherit; text-decoration: none; }
   transform: scaleX(0);
   transform-origin: left center;
 }
-#curtain.sweep-in .bck {
-  transform: scaleX(1);
-  transition: transform 0.32s var(--ease2);
-}
-#curtain.sweep-out {
-  transform: scaleX(0);
-  transition: transform 0.36s cubic-bezier(.25, .46, .45, .94);
-}
-#curtain.idle { display: none; }
+.curtain-cover #curtain,
+.curtain-in #curtain,
+.curtain-out #curtain { visibility: visible; will-change: transform; }
+.curtain-cover #curtain,
+.curtain-in #curtain { pointer-events: auto; }
+.curtain-cover #curtain .bck,
+.curtain-in #curtain .bck,
+.curtain-out #curtain .bck { transform: scaleX(1); }
+.curtain-in #curtain .bck { transition: transform 0.40s var(--ease-io); will-change: transform; }
+.curtain-out #curtain { transform: scaleX(0); transition: transform 0.45s var(--ease-io); }
+
+@keyframes uchi-failsafe-curtain { to { visibility: hidden; } }
+.curtain-cover #curtain { animation: uchi-failsafe-curtain 1ms linear 3s forwards; }
 
 /* ------------------------------------------------------- motion blur ----- */
 
@@ -793,6 +926,203 @@ a { color: inherit; text-decoration: none; }
   background-size: 140px 140px;
 }
 
+/* ==========================================================================
+   GALLERY  (ISU's COLLECTIONS, measured from css/style.css and
+   js/app/ui/Collections.js)
+   ==========================================================================
+
+   ISU sizes .content in JS: calculateAspectRatioFit(1320, 1240, W, H) where
+   W = viewport > 1320 ? 1320 : viewport * .9 and H = viewport height * .9
+   (desktop) or * .85 (tablet, 760-1024). The box is centred; the page
+   switcher sits right: (vw - content) / 2 - 20px, bottom 112px (tablet:
+   right (vw - content) / 2, bottom 62px). Done here with min() and no JS;
+   between 1320 and 1467px wide ISU's width can exceed 90vw, this caps it.
+
+   Slots, percentages of the content box (ISU #item-col-N):
+     1  w 24.7%  top 15.7%            left calc(1.4% - 20px)
+     2  w 24.7%  top 0                right calc(25.4% - 20px)
+     3  w 24.7%  top 15.7%            left calc(74.6% + 20px)
+     4  w 24.7%  top 50.7%            left 63.4%            z 14
+     5  w 24.7%  top calc(50.7% - 40px) right calc(25.4% - 20px)  z 13
+     6  w 48.7%  top calc(35% - 40px) left 25.9%
+   Text block ("FRAGMENT; NOUN, SINGULAR"): w 20%, left calc(25.9% + 20px),
+   bottom 72.5%; h5 Bebas 22px margin 0 0 12px; p Abel 15px/16px.
+   ISU's photographs are all 900x1201, so each frame is held at 3:4 and an
+   upload of another shape is cropped to it rather than breaking the collage.
+   ========================================================================== */
+
+.gallery-page #main-content { display: block; }
+
+#collections {
+  --cw: min(1320px, 90vw, calc(90svh * 1320 / 1240));
+  position: relative;
+  width: 100%;
+  height: 100svh;
+  min-height: 560px;
+}
+#collections .content {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  width: var(--cw);
+  height: calc(var(--cw) * 1240 / 1320);
+  top: calc((100% - var(--cw) * 1240 / 1320) / 2);
+}
+
+.collections-block {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  /* ISU paginateCollections(): out over 1.35s */
+  transition: opacity 1.35s var(--pow1-out), visibility 0s linear 1.35s;
+}
+.collections-block.is-current {
+  opacity: 1;
+  visibility: visible;
+  /* in over 1.35s, .3s after the old page starts to go */
+  transition: opacity 1.35s var(--pow1-out) 0.3s, visibility 0s;
+}
+
+.collections-fragments {
+  position: absolute;
+  width: 20%;
+  left: calc(25.9% + 20px);
+  bottom: 72.5%;
+}
+.frag__t {
+  margin: 0 0 12px 0;
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 22px;
+  font-weight: normal;
+}
+.frag__p {
+  font-family: var(--text);
+  font-size: 15px;
+  line-height: 16px;
+}
+@media (max-width: 1350px) { .frag__t { margin-bottom: 6px; } }
+/* ISU shrinks the block on shorter desktop screens (it also hides its long
+   paragraph there; the one line here is kept, it is the only copy). */
+@media (min-width: 760px) and (max-height: 950px) {
+  .frag__t { font-size: 20px; line-height: 20px; }
+  .frag__p { font-size: 13px; line-height: 14px; }
+}
+@media (min-width: 760px) and (max-height: 750px) {
+  .collections-fragments { width: 23%; left: calc(22.9% + 20px); bottom: calc(55.5% + 20px); }
+  .frag__p { font-size: 12px; line-height: 13px; }
+}
+
+.collections-block .item {
+  position: absolute;
+  margin: 0;   /* not the price list's .item rhythm */
+  width: 24.7%;
+  aspect-ratio: 900 / 1201;
+  opacity: 0;
+  transition: opacity 0.5s var(--ease-io);
+}
+.collections-block .item.is-loaded { opacity: 1; background: var(--ink); }
+.collections-block .item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 1;
+  transition: opacity 0.5s var(--ease-io);   /* ISU: .5s ease-in */
+  backface-visibility: hidden;
+}
+.collections-block .item:hover img { opacity: 0.75; }
+
+.collections-block #item-col-1 { top: 15.7%; left: calc(1.4% - 20px); }
+.collections-block #item-col-2 { top: 0; right: calc(25.4% - 20px); }
+.collections-block #item-col-3 { top: 15.7%; left: calc(74.6% + 20px); }
+.collections-block #item-col-4 { top: 50.7%; left: 63.4%; z-index: 14; }
+.collections-block #item-col-5 { top: calc(50.7% - 40px); right: calc(25.4% - 20px); z-index: 13; }
+.collections-block #item-col-6 { top: calc(35% - 40px); left: 25.9%; width: 48.7%; }
+
+#collections-nav {
+  position: absolute;
+  right: calc((100% - var(--cw)) / 2 - 20px);
+  bottom: 112px;
+  z-index: 3;
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 22px;
+}
+#collections-nav[hidden] { display: none; }
+#collections-nav button {
+  display: inline-block;
+  margin: 0 2px;
+  padding: 4px 3px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--grey);
+  cursor: pointer;
+  transition: color 0.35s ease-in;
+}
+#collections-nav button.selected,
+#collections-nav button:hover { color: var(--ink); }
+
+/* ISU's section intro: opacity 0, y 70 -> in over .45s. */
+.js #collections .content { opacity: 0; transform: translateY(70px); }
+.js #collections.is-ready .content {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.45s var(--pow1-out), transform 0.45s var(--pow1-out);
+}
+.js #collections:not(.is-ready) .content { animation: uchi-failsafe-show 1ms linear 9s forwards; }
+
+@media (min-width: 760px) and (max-width: 1024px) {
+  #collections { --cw: min(1320px, 90vw, calc(85svh * 1320 / 1240)); }
+  #collections-nav { right: calc((100% - var(--cw)) / 2); bottom: 62px; }
+}
+/* ISU's tablet slot positions apply to touch devices only (.tablet:not(#v-desk)). */
+@media (min-width: 760px) and (max-width: 1024px) and (hover: none) {
+  .collections-fragments { left: 24.7%; bottom: 75%; width: 25%; }
+  .frag__t { margin-bottom: 15px; }
+  .frag__p { font-size: 1.8vw; line-height: 2.1vw; }
+  .collections-block #item-col-1 { left: 0; top: 28.7%; }
+  .collections-block #item-col-3 { top: 6.7%; left: calc(73.4% - 40px); z-index: 20; }
+  .collections-block #item-col-4 { top: calc(41.7% + 20px); }
+  .collections-block #item-col-5 { right: calc(26.4% - 20px); top: 41.7%; }
+  .collections-block #item-col-6 { left: 24.7%; top: 35%; }
+}
+
+/* Phone: ISU's .collection-mobile, every page stacked, text first. */
+@media (max-width: 759px) {
+  #collections { height: auto; min-height: 0; }
+  #collections .content { position: static; width: 100%; height: auto; }
+  .collections-block,
+  .collections-block.is-current {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    opacity: 1;
+    visibility: visible;
+    transition: none;
+  }
+  .collections-fragments {
+    position: static;
+    order: -1;
+    width: 85%;
+    margin: 0 auto 30px auto;
+  }
+  .collections-block + .collections-block .collections-fragments { display: none; }
+  .frag__t { font-size: 6vw; line-height: 6vw; margin: 0 0 20px 0; }
+  .frag__p { font-size: 4vw; line-height: 4.8vw; }
+  .collections-block .item,
+  #collections .collections-block .item {
+    position: static;
+    width: 100%;
+    aspect-ratio: auto;
+  }
+  .collections-block .item img { height: auto; object-fit: initial; }
+  #collections-nav { display: none; }
+}
+
 /* ------------------------------------------------- reduced motion -------- */
 
 /*
@@ -801,14 +1131,17 @@ a { color: inherit; text-decoration: none; }
 */
 @media (prefers-reduced-motion: reduce) {
   .js .tapa,
-  .js #main-navigation,
+  .js #main-navigation li,
+  .js #ico-nav,
   .js #main-content,
+  .js #collections .content,
+  .collections-block,
+  .collections-block .item,
   #curtain,
   #curtain .bck { transition: none !important; }
   .js .tapa { transform: scaleX(0); }
-  .js #main-navigation { opacity: 1; transform: none; }
+  .js #main-navigation li, .js #ico-nav { opacity: 1; transform: none; }
+  .js #collections .content { opacity: 1; transform: none; }
   .js #main-content.is-shifting { filter: none; opacity: 1; }
   #curtain { display: none; }
-}
-
 }

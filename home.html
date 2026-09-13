@@ -13,31 +13,33 @@
   measured value, and the places this deliberately diverges from ISU's
   stylesheet, are documented at the top of assets/site.css.
 
-  COLLECTIONS is intentionally absent from the nav, per the brief. PRICES is
-  gone too: the price list now lives on the reservation page, beside the
+  ISU's COLLECTIONS lives on its own page here, /gallery. PRICES is
+  gone: the price list now lives on the reservation page, beside the
   service it prices, so there is one list rather than two that can disagree.
 
-  The opening hours here are rendered from assets/booking-data.js at load, not
+  The opening hours here are rendered from assets/booking-data.js at load (by
+  assets/js/site.js), not
   typed into this file. Published hours that contradict the hours the booking
   page will actually sell are the classic failure of a salon site, and the only
   way to make it impossible is to have one source.
 -->
 <link rel="icon" href="assets/favicon.png" type="image/png">
 <link rel="stylesheet" href="assets/site.css">
+<script src="assets/js/site.js"></script>
 </head>
 <body>
 
 <div class="page">
 
-  <div id="curtain" class="idle" aria-hidden="true"><span class="bck"></span></div>
+  <div id="curtain" aria-hidden="true"><span class="bck"></span></div>
 
-  <button id="ico-nav" type="button" aria-label="Menu" aria-expanded="false" aria-controls="main-navigation-mobile">
+  <button id="ico-nav" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="main-navigation-mobile">
     <span class="ln1"></span><span class="ln2"></span><span class="ln3"></span>
   </button>
 
   <header class="head">
     <h1 class="head__title">
-      <a class="head__mark" href="#home" data-sec="home">
+      <a class="head__mark" href="home">
         <picture>
           <source type="image/webp" srcset="assets/brand/uchi-logo.webp">
           <img src="assets/brand/uchi-logo.png" width="648" height="239" alt="UCHI, hair is hair">
@@ -117,8 +119,7 @@
           <p class="value"></p>
         </div>
         <!--
-          Rendered from assets/booking-data.js by the script at the foot of this
-          page. The rows below are the no-JavaScript fallback and are replaced
+          Rendered from assets/booking-data.js by assets/js/site.js. The rows below are the no-JavaScript fallback and are replaced
           wholesale on load; they are written out here so the hours are in the
           HTML for a reader without scripts, and a test asserts the two agree.
         -->
@@ -134,17 +135,19 @@
 
   <nav id="main-navigation" aria-label="Primary">
     <ul>
-      <li data-sec="intro" data-text="INTRO">INTRO</li>
-      <li data-sec="contact" data-text="CONTACT">CONTACT</li>
+      <li data-text="INTRO"><a href="home#intro" data-sec="intro">INTRO</a></li>
+      <li data-text="CONTACT"><a href="home#contact" data-sec="contact">CONTACT</a></li>
+      <li data-text="GALLERY"><a href="gallery">GALLERY</a></li>
       <li data-text="RESERVATION"><a href="reservation">RESERVATION</a></li>
     </ul>
   </nav>
 
   <nav id="main-navigation-mobile" aria-label="Primary, mobile">
     <ul>
-      <li data-sec="home" data-text="HOME">HOME</li>
-      <li data-sec="intro" data-text="INTRO">INTRO</li>
-      <li data-sec="contact" data-text="CONTACT">CONTACT</li>
+      <li data-text="HOME" class="selected"><a href="home" data-sec="home" aria-current="location">HOME</a></li>
+      <li data-text="INTRO"><a href="home#intro" data-sec="intro">INTRO</a></li>
+      <li data-text="CONTACT"><a href="home#contact" data-sec="contact">CONTACT</a></li>
+      <li data-text="GALLERY"><a href="gallery">GALLERY</a></li>
       <li data-text="RESERVATION"><a href="reservation">RESERVATION</a></li>
     </ul>
   </nav>
@@ -153,130 +156,5 @@
 
 <script src="assets/booking-data.js"></script>
 <script src="assets/booking-core.js"></script>
-<script>
-(function () {
-  /*
-    Motion is opt-in: the .js class is what switches the covers, the curtain and
-    the blur on. Without this script none of it applies and the page is simply
-    present - no element is ever left hidden by a decoration that failed to run.
-  */
-  var root = document.documentElement;
-  root.className += (root.className ? ' ' : '') + 'js';
-
-  var page = document.querySelector('.page');
-  var curtain = document.getElementById('curtain');
-  var content = document.getElementById('main-content');
-  var sections = document.querySelectorAll('.section');
-  var burger = document.getElementById('ico-nav');
-  var mobileNav = document.getElementById('main-navigation-mobile');
-  var navItems = document.querySelectorAll('[data-sec]');
-  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  /* ---- opening hours, painted from the booking data ------------------- */
-
-  /*
-    The same values the booking page sells slots from. Repainting at runtime
-    rather than trusting the markup means the published hours cannot survive a
-    change to booking-data.js that nobody remembered to mirror here.
-  */
-  (function paintHours() {
-    if (!window.SHOP || !window.BookingCore) return;
-    var host = document.getElementById('hours-rows');
-    if (!host) return;
-    host.textContent = '';
-    /* hoursSummary, not hoursRows: consecutive days sharing a value collapse
-       into one range, so the five identical weekday lines become one. */
-    window.BookingCore.hoursSummary(window.SHOP).forEach(function (r) {
-      var item = document.createElement('div');
-      item.className = 'item';
-      var d = document.createElement('p'); d.className = 'desc'; d.textContent = r.label;
-      var v = document.createElement('p'); v.className = 'value'; v.textContent = r.value;
-      item.appendChild(d); item.appendChild(v);
-      host.appendChild(item);
-    });
-    var br = document.getElementById('hours-break');
-    var label = window.BookingCore.breakLabel(window.SHOP);
-    if (br) br.textContent = label ? 'Closed for a break ' + label + '.' : '';
-  })();
-
-  /* ---- the opening reveal (ISU timings live in the stylesheet) --------- */
-
-  function reveal() { page.classList.add('is-revealed'); }
-  // Two frames, so the covers are painted at scaleX(1) before they transition.
-  requestAnimationFrame(function () { requestAnimationFrame(reveal); });
-
-  /* ---- section swap ---------------------------------------------------- */
-
-  function swap(id) {
-    for (var i = 0; i < sections.length; i++) {
-      sections[i].classList.toggle('is-active', sections[i].id === id);
-    }
-    var desktop = document.querySelectorAll('#main-navigation li');
-    for (var j = 0; j < desktop.length; j++) {
-      desktop[j].classList.toggle('selected', desktop[j].dataset.sec === id);
-    }
-    if (history.replaceState) history.replaceState(null, '', id === 'home' ? '#' : '#' + id);
-  }
-
-  var busy = false;
-  function show(id) {
-    if (busy) return;
-    closeMenu();
-    if (reduce || !curtain) { swap(id); return; }
-    busy = true;
-
-    // ISU sweeps a paper curtain in from the left, changes behind it, then
-    // sweeps it away to the right. The blur rides the same beat.
-    curtain.classList.remove('idle', 'sweep-out');
-    content.classList.add('is-shifting');
-    requestAnimationFrame(function () { curtain.classList.add('sweep-in'); });
-
-    setTimeout(function () {
-      swap(id);
-      curtain.classList.remove('sweep-in');
-      curtain.classList.add('sweep-out');
-      content.classList.remove('is-shifting');
-      setTimeout(function () {
-        curtain.classList.add('idle');
-        curtain.classList.remove('sweep-out');
-        busy = false;
-      }, 380);
-    }, 320);
-  }
-
-  /* ---- mobile menu ----------------------------------------------------- */
-
-  function openMenu() {
-    mobileNav.classList.add('open');
-    burger.classList.add('open');
-    burger.setAttribute('aria-expanded', 'true');
-  }
-  function closeMenu() {
-    if (!mobileNav) return;
-    mobileNav.classList.remove('open');
-    burger.classList.remove('open');
-    burger.setAttribute('aria-expanded', 'false');
-  }
-  if (burger) {
-    burger.addEventListener('click', function () {
-      if (mobileNav.classList.contains('open')) closeMenu(); else openMenu();
-    });
-  }
-
-  for (var k = 0; k < navItems.length; k++) {
-    navItems[k].addEventListener('click', function (e) {
-      e.preventDefault();
-      show(this.dataset.sec);
-    });
-  }
-
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && mobileNav && mobileNav.classList.contains('open')) closeMenu();
-  });
-
-  var initial = (location.hash || '').replace('#', '');
-  if (initial && document.getElementById(initial)) swap(initial);
-})();
-</script>
 </body>
 </html>

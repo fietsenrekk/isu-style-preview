@@ -1,0 +1,26 @@
+# UCHI on Netlify. Only dist/ is published (see tools/build.mjs).
+[build]
+  command = "node tools/build.mjs"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Clean URLs: /home, /gallery, /reservation, /admin are served from the
+# matching .html files by Netlify's pretty-URL handling. The root forwards.
+[[redirects]]
+  from = "/"
+  to = "/home"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/index.html"
+  to = "/home"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/*.html"
+  to = "/:splat"
+  status = 301

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>UCHI admin</title>
+<!--
+  UCHI owner dashboard. Never linked from the public site.
+  All markup below is static; every piece of data is added by
+  assets/admin/*.js with createElement + textContent (strict CSP).
+-->
+<link rel="icon" href="/assets/favicon.png" type="image/png">
+<link rel="stylesheet" href="/assets/admin/admin.css">
+</head>
+<body class="admin">
+
+<a class="skip" href="#main">Skip to content</a>
+
+<div id="boot" class="boot" role="status"><span class="boot__rule"></span><span class="boot__text">Loading</span></div>
+
+<!-- ============================================================ sign-in == -->
+<section id="auth" class="auth" hidden aria-labelledby="auth-title">
+  <div class="auth__box">
+    <picture class="logo logo--auth">
+      <source type="image/webp" srcset="/assets/brand/uchi-logo.webp">
+      <img src="/assets/brand/uchi-logo.png" width="648" height="239" alt="UCHI">
+    </picture>
+    <h1 class="auth__title" id="auth-title">Admin</h1>
+
+    <p id="auth-banner" class="msg" role="status" aria-live="polite"></p>
+
+    <form id="form-signin" class="auth__form" novalidate>
+      <div class="field">
+        <label class="field__label" for="si-email">E-mail</label>
+        <input id="si-email" name="email" type="email" autocomplete="username" inputmode="email" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="si-pw">Password</label>
+        <input id="si-pw" name="password" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="btn btn--ink btn--wide" type="submit">Sign in</button>
+      <div class="auth__links">
+        <button class="linkbtn" type="button" data-show="reset">Forgot password?</button>
+        <button class="linkbtn" type="button" data-show="signup">First time? Create your login</button>
+      </div>
+    </form>
+
+    <form id="form-signup" class="auth__form" novalidate hidden>
+      <p class="auth__explain">Only e-mail addresses on the salon's admin list can use this dashboard. Create a password here, then open the confirmation e-mail and tap its link before signing in.</p>
+      <div class="field">
+        <label class="field__label" for="su-email">E-mail on the admin list</label>
+        <input id="su-email" name="email" type="email" autocomplete="username" inputmode="email" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="su-pw">New password (at least 8 characters)</label>
+        <input id="su-pw" name="password" type="password" autocomplete="new-password" minlength="8" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="su-pw2">Repeat password</label>
+        <input id="su-pw2" name="password2" type="password" autocomplete="new-password" minlength="8" required>
+      </div>
+      <button class="btn btn--ink btn--wide" type="submit">Create login</button>
+      <div class="auth__links">
+        <button class="linkbtn" type="button" data-show="signin">Back to sign in</button>
+      </div>
+    </form>
+
+    <form id="form-reset" class="auth__form" novalidate hidden>
+      <p class="auth__explain">Enter your e-mail and we send a link to choose a new password.</p>
+      <div class="field">
+        <label class="field__label" for="rs-email">E-mail</label>
+        <input id="rs-email" name="email" type="email" autocomplete="username" inputmode="email" required>
+      </div>
+      <button class="btn btn--ink btn--wide" type="submit">Send reset link</button>
+      <div class="auth__links">
+        <button class="linkbtn" type="button" data-show="signin">Back to sign in</button>
+      </div>
+    </form>
+
+    <form id="form-newpass" class="auth__form" novalidate hidden>
+      <div class="field">
+        <label class="field__label" for="np-pw">New password (at least 8 characters)</label>
+        <input id="np-pw" name="password" type="password" autocomplete="new-password" minlength="8" required>
+      </div>
+      <div class="field">
+        <label class="field__label" for="np-pw2">Repeat new password</label>
+        <input id="np-pw2" name="password2" type="password" autocomplete="new-password" minlength="8" required>
+      </div>
+      <button class="btn btn--ink btn--wide" type="submit">Save new password</button>
+    </form>
+  </div>
+</section>
+
+<!-- ============================================================ dashboard == -->
+<div id="app" class="app" hidden>
+  <header class="bar">
+    <a class="bar__logo" href="#bookings" data-panel="bookings" aria-label="UCHI admin, bookings">
+      <picture class="logo">
+        <source type="image/webp" srcset="/assets/brand/uchi-logo.webp">
+        <img src="/assets/brand/uchi-logo.png" width="648" height="239" alt="UCHI">
+      </picture>
+    </a>
+    <nav class="nav" aria-label="Dashboard">
+      <ul class="nav__list">
+        <li><button class="nav__btn" type="button" data-panel="bookings">Bookings</button></li>
+        <li><button class="nav__btn" type="button" data-panel="gallery">Gallery</button></li>
+        <li><button class="nav__btn" type="button" data-panel="services">Services</button></li>
+        <li><button class="nav__btn" type="button" data-panel="hours">Hours</button></li>
+        <li><button class="nav__btn" type="button" data-panel="team">Team</button></li>
+      </ul>
+    </nav>
+    <div class="bar__user">
+      <span class="bar__who" id="who"></span>
+      <button class="btn btn--quiet" type="button" id="signout">Sign out</button>
+    </div>
+  </header>
+
+  <p id="demo-flag" class="demo-flag" hidden>Demo data. Nothing is saved.</p>
+
+  <main id="main" class="main" tabindex="-1">
+    <section id="panel-bookings" class="panel" tabindex="-1" aria-labelledby="h-bookings" hidden></section>
+    <section id="panel-gallery" class="panel" tabindex="-1" aria-labelledby="h-gallery" hidden></section>
+    <section id="panel-services" class="panel" tabindex="-1" aria-labelledby="h-services" hidden></section>
+    <section id="panel-hours" class="panel" tabindex="-1" aria-labelledby="h-hours" hidden></section>
+    <section id="panel-team" class="panel" tabindex="-1" aria-labelledby="h-team" hidden></section>
+  </main>
+</div>
+
+<dialog id="confirm" class="dlg" aria-labelledby="confirm-text">
+  <p id="confirm-text" class="dlg__title"></p>
+  <p id="confirm-detail" class="dlg__detail"></p>
+  <div class="actions">
+    <button id="confirm-ok" class="btn btn--ink" type="button">Yes</button>
+    <button id="confirm-no" class="btn" type="button">Go back</button>
+  </div>
+</dialog>
+
+<script src="/assets/vendor/supabase-2.116.0.js"></script>
+<script src="/assets/supabase-config.js"></script>
+<script src="/assets/js/sb.js"></script>
+<script src="/assets/booking-data.js"></script>
+<script src="/assets/admin/tz.js"></script>
+<script src="/assets/admin/util.js"></script>
+<script src="/assets/admin/api.js"></script>
+<script src="/assets/admin/demo.js"></script>
+<script src="/assets/admin/bookings.js"></script>
+<script src="/assets/admin/gallery.js"></script>
+<script src="/assets/admin/services.js"></script>
+<script src="/assets/admin/hours.js"></script>
+<script src="/assets/admin/team.js"></script>
+<script src="/assets/admin/admin.js"></script>
+</body>
+</html>

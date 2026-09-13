@@ -8,11 +8,14 @@
   under Node, which is how tools/booking-test.mjs checks the slot maths
   against hand-worked cases instead of me squinting at a rendered calendar.
 
-  Times are handled as minutes-from-midnight integers. Dates are the visitor's
-  local dates. A salon in Antwerp is booked by people in Antwerp, and the one
-  thing that must never happen is a slot rendered in one zone and interpreted
-  in another, so no UTC conversion happens anywhere: the date the visitor picks
-  is the date that is sent.
+  Times on the grid are minutes-from-midnight integers on a calendar date, and
+  that calendar date plus 'HH:MM' is exactly what is sent to create_booking,
+  which reads it as Brussels time. Where a slot has to be compared with
+  something real (booked ranges from busy_slots, or the current instant for
+  the lead time) it is converted with brusselsEpoch(), which uses the
+  Europe/Brussels zone rules via Intl and never the machine's own zone. So a
+  visitor abroad sees salon times, and the check against bookings is right on
+  both DST change days.
 */
 
 (function (root, factory) {
@@ -245,6 +248,144 @@
     return out;
   }
 
+  /* --------------------------------------------------- Brussels clock ----- */
+
+  /*
+    The salon's diary lives in Europe/Brussels and the database stores
+    instants. Everything that compares a slot to a booked range, or to "now",
+    must therefore turn a salon wall-clock time into a real instant, and it
+    must do so the same way on a visitor's laptop in Tokyo as on one in
+    Antwerp. Intl knows the zone rules; Date's local-time methods only know
+    the machine's zone, so they are never used for this.
+
+    A `date` argument below is a calendar date carried in a Date object: only
+    its getFullYear/getMonth/getDate fields are read, never its instant.
+  */
+  var ZONE = 'Europe/Brussels';
+  var fmt = null;
+  function zoneParts(ms) {
+    if (!fmt) {
+      fmt = new Intl.DateTimeFormat('en-GB', {
+        timeZone: ZONE, hourCycle: 'h23',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    var p = {};
+    fmt.formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+    return {
+      y: +p.year, m: +p.month, d: +p.day,
+      h: +p.hour % 24, mi: +p.minute, s: +p.second
+    };
+  }
+
+  /* How far Brussels wall-clock is ahead of UTC at this instant, in ms. */
+  function zoneOffset(ms) {
+    var p = zoneParts(ms);
+    var asUtc = Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi, p.s);
+    return asUtc - Math.floor(ms / 1000) * 1000;
+  }
+
+  /*
+    Brussels calendar date + 'HH:MM' -> UTC epoch ms. Two passes, because the
+    offset to use is the one in force at the answer, not at the guess; the
+    second pass settles the hours either side of a DST change. (Times that do
+    not exist, 02:30 on the spring-forward night, land an hour late. The salon
+    is closed then.)
+  */
+  function brusselsEpoch(y, m, d, hm) {
+    var mins = typeof hm === 'number' ? hm : parseHM(hm);
+    if (isNaN(mins)) return NaN;
+    var guess = Date.UTC(y, m - 1, d, 0, mins);
+    var first = guess - zoneOffset(guess);
+    var second = guess - zoneOffset(first);
+    return second;
+  }
+
+  /* Calendar-date Date + minutes-from-midnight -> epoch ms. */
+  function slotEpoch(date, hm) {
+    return brusselsEpoch(date.getFullYear(), date.getMonth() + 1, date.getDate(), hm);
+  }
+
+  /* The Brussels calendar date at an instant, as a calendar-date Date. */
+  function brusselsToday(now) {
+    var p = zoneParts(+now);
+    return new Date(p.y, p.m - 1, p.d);
+  }
+
+  /* An instant as Brussels { date: 'YYYY-MM-DD', time: 'HH:MM', dow }. */
+  function brusselsLabel(ms) {
+    var p = zoneParts(+ms);
+    var two = function (n) { return (n < 10 ? '0' : '') + n; };
+    return {
+      date: p.y + '-' + two(p.m) + '-' + two(p.d),
+      time: two(p.h) + ':' + two(p.mi),
+      dow: new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay(),
+      y: p.y, m: p.m, d: p.d
+    };
+  }
+
+  /* Calendar-date Date -> 'YYYY-MM-DD', as the database wants it. */
+  function isoDate(date) {
+    var m = date.getMonth() + 1, d = date.getDate();
+    return date.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d;
+  }
+
+  /* ------------------------------------------------------ availability ---- */
+
+  function toMs(x) {
+    if (typeof x === 'number') return x;
+    if (x instanceof Date) return x.getTime();
+    return Date.parse(x);
+  }
+
+  /*
+    Does this stylist have anything booked (or time off) overlapping
+    [start, start + minutes)? Ranges are half-open, so a booking ending at
+    11:00 and one starting at 11:00 do not overlap, matching the database's
+    tstzrange '[)' exclusion constraint.
+  */
+  function busyOverlaps(busy, staffId, startDate, minutes) {
+    var s = toMs(startDate), e = s + minutes * 60000;
+    return (busy || []).some(function (b) {
+      return b.staff_id === staffId && toMs(b.starts_at) < e && toMs(b.ends_at) > s;
+    });
+  }
+
+  /*
+    slotsFor, then two more tests per start time:
+      - it is at least leadTimeMinutes after `now`, compared as real instants;
+      - at least one of `staffIds` is free for the whole duration.
+    `busy === null` means "availability unknown": only the clock test applies.
+    An empty `staffIds` means nobody can do it, so nothing is free.
+  */
+  function freeSlotsFor(shop, date, minutes, now, busy, staffIds) {
+    var base = slotsFor(shop, date, minutes, null);
+    var cutoff = now ? toMs(now) + (shop.hours.leadTimeMinutes || 0) * 60000 : -Infinity;
+    var ids = staffIds || [];
+    return base.filter(function (t) {
+      var at = slotEpoch(date, t);
+      if (at < cutoff) return false;
+      if (busy == null) return true;
+      return ids.some(function (id) { return !busyOverlaps(busy, id, at, minutes); });
+    });
+  }
+
+  /* bookableDays, counted from the Brussels date of `now`, skipping days
+     where freeSlotsFor finds nothing. */
+  function bookableDaysFree(shop, minutes, now, count, horizon, busy, staffIds) {
+    var out = [];
+    var from = brusselsToday(now);
+    var limit = horizon || 90;
+    for (var i = 0; i < limit && out.length < (count || 14); i++) {
+      var d = addDays(from, i);
+      if (!isOpenOn(shop, d)) continue;
+      if (freeSlotsFor(shop, d, minutes, now, busy, staffIds).length === 0) continue;
+      out.push(d);
+    }
+    return out;
+  }
+
   /* ------------------------------------------------------------ hours ----- */
 
   /*
@@ -323,6 +464,14 @@
     addDays: addDays,
     slotsFor: slotsFor,
     bookableDays: bookableDays,
+    brusselsEpoch: brusselsEpoch,
+    slotEpoch: slotEpoch,
+    brusselsToday: brusselsToday,
+    brusselsLabel: brusselsLabel,
+    isoDate: isoDate,
+    busyOverlaps: busyOverlaps,
+    freeSlotsFor: freeSlotsFor,
+    bookableDaysFree: bookableDaysFree,
     hoursRows: hoursRows,
     breakLabel: breakLabel
   };

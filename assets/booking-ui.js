@@ -1,10 +1,10 @@
 /*
-  UCHI — booking UI
+  UCHI - booking UI
   =================
 
   Renders the four choices (stylist, services, day, time) and the details form,
-  then hands the finished booking to whatever provider is configured in
-  assets/booking-provider.js.
+  then hands the finished booking to assets/booking-provider.js, which books it
+  through the database.
 
   All decision-making lives in booking-core.js. This file only draws what the
   core says is possible and reports what the visitor picked, which is why the
@@ -16,10 +16,21 @@
       greys the colour work and choosing colour work greys Labi, without either
       rule being written twice.
 
+  Data:
+    - first paint uses the static catalogue (window.SHOP) so the page is
+      usable at once; when UchiCatalog.load() brings the database catalogue it
+      replaces the static one, but only if the visitor has not picked anything
+      yet, so nothing moves under their finger;
+    - taken time comes from rpc('busy_slots') for today..horizon, fetched once
+      and again when a choice changes after it has gone a minute stale, or when
+      the server says a time was just taken. Only times where the chosen
+      stylist (or, with no preference, any stylist able to do the whole set)
+      is free are offered. If busy_slots cannot be reached, every time on the
+      grid is offered and the page says availability was not checked; the
+      server still refuses a taken slot.
+
   Progressive enhancement: without this script the page still shows the full
   price list, the opening hours and the phone number, marked up in the HTML.
-  This script replaces that static block with the interactive one. Nothing the
-  visitor needs is created by JavaScript alone.
 */
 
 (function () {
@@ -32,8 +43,12 @@
 
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* The whole of the visitor's progress. Nothing else holds state. */
+  /* The whole of the visitor's progress. */
   var pick = { staff: null, services: [], date: null, time: null };
+
+  /* Taken time. status: 'loading' | 'ok' | 'failed'. ranges null = unknown. */
+  var busy = { status: 'loading', ranges: null, at: 0, seq: 0 };
+  var STALE_MS = 60000;
 
   /* ------------------------------------------------------------ helpers -- */
 
@@ -54,20 +69,56 @@
   function longDate(d) {
     return DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()];
   }
-  function chosen() { return pick.services.slice(); }
+  function horizon() {
+    return Math.min(SHOP.hours.bookingHorizonDays || 60, 61);
+  }
 
-  /* Anything that changes what is being booked invalidates the day and time,
-     because both were calculated from a duration that has just changed. */
+  /* Who could take the current set: the chosen stylist, or everyone able. */
+  function candidates() {
+    if (pick.staff) return [pick.staff];
+    return Core.staffForSet(SHOP, pick.services).map(function (p) { return p.id; });
+  }
+
+  /* Anything that changes what is being booked invalidates the day and time. */
   function resetWhen() { pick.date = null; pick.time = null; }
+
+  /* ------------------------------------------------------------ busy ----- */
+
+  function fetchBusy() {
+    var seq = ++busy.seq;
+    var db = window.UchiDB;
+    var client = null;
+    try { client = db && db.client ? db.client() : null; } catch (e) { client = null; }
+    if (!client) {
+      busy.status = 'failed'; busy.ranges = null; busy.at = Date.now();
+      render();
+      return Promise.resolve();
+    }
+    busy.status = 'loading';
+    render();
+    var today = Core.brusselsToday(new Date());
+    var args = { p_from: Core.isoDate(today), p_to: Core.isoDate(Core.addDays(today, horizon())) };
+    return Promise.resolve()
+      .then(function () { return client.rpc('busy_slots', args); })
+      .then(function (r) {
+        if (seq !== busy.seq) return;
+        if (r.error || !Array.isArray(r.data)) { busy.status = 'failed'; busy.ranges = null; }
+        else { busy.status = 'ok'; busy.ranges = r.data; }
+        busy.at = Date.now();
+        render();
+      }, function () {
+        if (seq !== busy.seq) return;
+        busy.status = 'failed'; busy.ranges = null; busy.at = Date.now();
+        render();
+      });
+  }
+
+  function refreshIfStale() {
+    if (busy.status !== 'loading' && Date.now() - busy.at > STALE_MS) fetchBusy();
+  }
 
   /* ------------------------------------------------------------ sections -- */
 
-  /*
-    Each step is a <section> that is present from the start but inert until it
-    has something to show. Revealing by class rather than by building nodes on
-    demand keeps the page height honest as you go and lets the transition be
-    pure CSS.
-  */
   function step(n, title) {
     var s = el('section', 'step');
     s.dataset.step = n;
@@ -87,12 +138,6 @@
 
   /* --------------------------------------------------------------- rows --- */
 
-  /*
-    One row of the price-list lockup: label right-aligned against the centre
-    rule, value left-aligned after it. The same geometry the contact section
-    uses, so the booking page reads as part of the same object rather than a
-    form bolted onto it.
-  */
   function row(labelText, valueText) {
     var b = el('button', 'item item--pick');
     b.type = 'button';
@@ -116,25 +161,27 @@
   /* ------------------------------------------------------------- step 1 --- */
 
   var staffNodes = {};
-  (function buildStaff() {
+  function buildStaff() {
     var body = stepStaff.querySelector('.step__body');
+    body.textContent = '';
+    staffNodes = {};
     var wrap = el('div', 'box');
     wrap.appendChild(el('span', 'rule'));
     SHOP.staff.forEach(function (person) {
       var b = row(person.name, person.role);
       b.addEventListener('click', function () {
         pick.staff = (pick.staff === person.id) ? null : person.id;
-        /*
-          Drop anything the newly chosen stylist cannot do. The disabled state
-          normally makes this unreachable, but state that stays valid only
-          because the UI refuses to be clicked is state waiting to go wrong.
-        */
+        /* Drop anything the newly chosen stylist cannot do. */
         if (pick.staff) {
           var keep = pick.services.filter(function (id) {
             return Core.canDo(SHOP, pick.staff, id);
           });
           if (keep.length !== pick.services.length) { pick.services = keep; resetWhen(); }
         }
+        /* A different stylist has different free times. */
+        pick.time = null;
+        clearTimeAlert();
+        refreshIfStale();
         render();
       });
       staffNodes[person.id] = b;
@@ -143,13 +190,15 @@
     body.appendChild(wrap);
     body.appendChild(el('p', 'step__hint',
       'Either stylist, or skip and let the services decide.'));
-  })();
+  }
 
   /* ------------------------------------------------------------- step 2 --- */
 
   var serviceNodes = {};
-  (function buildServices() {
+  function buildServices() {
     var body = stepService.querySelector('.step__body');
+    body.textContent = '';
+    serviceNodes = {};
     var wrap = el('div', 'box');
     wrap.appendChild(el('span', 'rule'));
     SHOP.services.forEach(function (sv) {
@@ -159,18 +208,13 @@
         if (at === -1) pick.services.push(sv.id);
         else pick.services.splice(at, 1);
         resetWhen();
-        /*
-          If only one stylist can take everything now selected, select them.
-          Asking someone to choose balayage and then choose the only person who
-          does balayage is a question with one possible answer.
-
-          If a stylist was already chosen and the set has moved beyond them,
-          they are cleared rather than left standing as a contradiction that
-          the greyed-out row is quietly hiding.
-        */
+        clearTimeAlert();
+        /* One able stylist left: choose them. A stylist who can no longer
+           take the set: clear them. */
         var able = Core.staffForSet(SHOP, pick.services);
         if (pick.services.length && able.length === 1) pick.staff = able[0].id;
         else if (pick.staff && !Core.canDoAll(SHOP, pick.staff, pick.services)) pick.staff = null;
+        refreshIfStale();
         render();
       });
       serviceNodes[sv.id] = b;
@@ -186,21 +230,34 @@
       'Choose one or more services. A cut, a colour and a wash can be booked in '
       + 'the same visit. Prices are in euro and depend on the length of your hair '
       + 'and the work involved. Everyone pays the same.'));
-  })();
+  }
 
   /* ------------------------------------------------------------- step 3 --- */
 
   var dateStrip = el('div', 'strip');
   stepDate.querySelector('.step__body').appendChild(dateStrip);
 
+  function currentBusy() {
+    return busy.status === 'ok' ? busy.ranges : null;
+  }
+
   function buildDates() {
     dateStrip.textContent = '';
     var mins = Core.totalMinutes(SHOP, pick.services);
     if (!mins) return;
-    var days = Core.bookableDays(SHOP, mins, new Date(), 10);
+    if (busy.status === 'loading') {
+      dateStrip.appendChild(el('p', 'step__hint', 'Checking availability'));
+      return;
+    }
+    var days = Core.bookableDaysFree(SHOP, mins, new Date(), 10, horizon(),
+                                     currentBusy(), candidates());
+    if (pick.date && !days.some(function (d) { return dateKey(d) === dateKey(pick.date); })) {
+      pick.date = null; pick.time = null;
+    }
     if (!days.length) {
       dateStrip.appendChild(el('p', 'step__hint',
-        'That combination does not fit in one day. Please call the salon.'));
+        'There is no free time for this booking online. Please call the salon on '
+        + window.BookingProvider.phone + '.'));
       return;
     }
     days.forEach(function (d) {
@@ -209,11 +266,12 @@
       b.appendChild(el('span', 'chip__dow', DAYS[d.getDay()]));
       b.appendChild(el('span', 'chip__num', String(d.getDate())));
       b.appendChild(el('span', 'chip__mon', MONTHS[d.getMonth()]));
-      setPicked(b, pick.date && dateKey(pick.date) === dateKey(d));
+      setPicked(b, !!(pick.date && dateKey(pick.date) === dateKey(d)));
       b.addEventListener('click', function () {
         var same = pick.date && dateKey(pick.date) === dateKey(d);
         pick.date = same ? null : d;
         pick.time = null;
+        clearTimeAlert();
         render();
       });
       dateStrip.appendChild(b);
@@ -222,17 +280,30 @@
 
   /* ------------------------------------------------------------- step 4 --- */
 
+  var timeAlert = el('p', 'step__hint');
   var timeGrid = el('div', 'grid');
   var timeNote = el('p', 'step__hint');
+  stepTime.querySelector('.step__body').appendChild(timeAlert);
   stepTime.querySelector('.step__body').appendChild(timeGrid);
   stepTime.querySelector('.step__body').appendChild(timeNote);
+
+  function clearTimeAlert() {
+    timeAlert.textContent = '';
+    timeAlert.removeAttribute('role');
+  }
 
   function buildTimes() {
     timeGrid.textContent = '';
     timeNote.textContent = '';
     var mins = Core.totalMinutes(SHOP, pick.services);
     if (!mins || !pick.date) return;
-    var slots = Core.slotsFor(SHOP, pick.date, mins, new Date());
+    if (busy.status === 'loading') {
+      timeGrid.appendChild(el('p', 'step__hint', 'Checking availability'));
+      return;
+    }
+    var slots = Core.freeSlotsFor(SHOP, pick.date, mins, new Date(),
+                                  currentBusy(), candidates());
+    if (pick.time && slots.indexOf(pick.time) === -1) pick.time = null;
     if (!slots.length) {
       timeGrid.appendChild(el('p', 'step__hint', 'Nothing left on this day.'));
       return;
@@ -243,26 +314,33 @@
       setPicked(b, pick.time === t);
       b.addEventListener('click', function () {
         pick.time = (pick.time === t) ? null : t;
+        clearTimeAlert();
         render();
       });
       timeGrid.appendChild(b);
     });
     var br = Core.breakLabel(SHOP);
-    timeNote.textContent = (br ? 'Closed for a break ' + br + '. ' : '')
+    timeNote.textContent = (busy.status === 'failed'
+        ? 'Availability could not be checked right now, so some of these times may '
+          + 'already be taken. If yours is, you will be asked to pick another. '
+        : '')
+      + 'Times are salon time. '
+      + (br ? 'Closed for a break ' + br + '. ' : '')
       + 'Your booking takes about ' + mins + ' minutes.';
   }
 
   /* ------------------------------------------------------------- step 5 --- */
 
-  var form, summary;
+  var form, summary, noteNode;
   (function buildDetails() {
     var body = stepDetails.querySelector('.step__body');
     form = el('form', 'bform');
+    form.noValidate = false;
 
-    [['name', 'NAME', 'text', true, 'name'],
-     ['email', 'E-MAIL', 'email', true, 'email'],
-     ['phone', 'PHONE', 'tel', true, 'tel'],
-     ['notes', 'ANYTHING WE SHOULD KNOW', 'textarea', false, 'off']
+    [['name', 'NAME', 'text', true, 'name', 80],
+     ['email', 'E-MAIL', 'email', true, 'email', 120],
+     ['phone', 'PHONE', 'tel', true, 'tel', 30],
+     ['notes', 'ANYTHING WE SHOULD KNOW', 'textarea', false, 'off', 500]
     ].forEach(function (f) {
       var wrap = el('label', 'bfield');
       wrap.appendChild(el('span', 'bfield__l', f[1] + (f[3] ? '' : ' (optional)')));
@@ -271,58 +349,97 @@
       input.name = f[0];
       input.required = f[3];
       input.autocomplete = f[4];
+      input.maxLength = f[5];
       if (f[2] === 'textarea') input.rows = 3;
       wrap.appendChild(input);
       form.appendChild(wrap);
     });
 
+    /* Honeypot. People never see or reach it; form-filling bots tend to fill
+       anything called "website". The server refuses a booking that has it. */
+    var trap = el('div');
+    trap.setAttribute('aria-hidden', 'true');
+    trap.style.position = 'absolute';
+    trap.style.left = '-10000px';
+    trap.style.top = 'auto';
+    trap.style.width = '1px';
+    trap.style.height = '1px';
+    trap.style.overflow = 'hidden';
+    var hp = el('input');
+    hp.type = 'text';
+    hp.name = 'website';
+    hp.tabIndex = -1;
+    hp.autocomplete = 'off';
+    trap.appendChild(hp);
+    form.appendChild(trap);
+
     summary = el('p', 'bsummary');
     form.appendChild(summary);
 
-    var submit = el('button', 'bsubmit', 'REQUEST THIS APPOINTMENT');
+    var submit = el('button', 'bsubmit', 'BOOK THIS APPOINTMENT');
     submit.type = 'submit';
     form.appendChild(submit);
 
-    form.appendChild(el('p', 'step__hint bnote', ''));
+    noteNode = el('p', 'step__hint bnote', '');
+    form.appendChild(noteNode);
 
+    var sending = false;
     form.addEventListener('submit', function (e) {
       e.preventDefault();
+      if (sending) return;
       if (!form.reportValidity()) return;
+      if (!pick.services.length || !pick.date || !pick.time) return;
+      var field = function (n) { return form.elements.namedItem(n).value.trim(); };
       var set = Core.servicesIn(SHOP, pick.services);
       var who = pick.staff ? Core.staffMember(SHOP, pick.staff) : null;
+      sending = true;
       window.BookingProvider.submit({
         shop: SHOP.name,
         staffId: pick.staff,
-        staffName: who ? who.name : 'No preference',
+        staffName: who ? who.name : 'First available stylist',
         services: set.map(function (s) {
           return { id: s.id, name: s.name, nl: s.nl,
                    price: Core.priceLabel(s), minutes: s.minutes };
         }),
-        serviceName: set.map(function (s) { return s.name; }).join(' + '),
-        serviceNl: set.map(function (s) { return s.nl; }).join(' + '),
         price: Core.totalPriceLabel(SHOP, pick.services),
         minutes: Core.totalMinutes(SHOP, pick.services),
         date: pick.date,
+        isoDate: Core.isoDate(pick.date),
         dateLabel: longDate(pick.date),
         time: pick.time,
-        name: form.name.value.trim(),
-        email: form.email.value.trim(),
-        phone: form.phone.value.trim(),
-        notes: form.notes.value.trim()
-      }, form);
+        name: field('name'),
+        email: field('email'),
+        phone: field('phone'),
+        notes: field('notes'),
+        hp: form.elements.namedItem('website').value
+      }, form, {
+        onRetime: function (code) {
+          timeAlert.setAttribute('role', 'alert');
+          timeAlert.textContent = window.BookingProvider.message(code);
+          noteNode.removeAttribute('role');
+          noteNode.textContent = '';
+          pick.time = null;
+          fetchBusy();
+          stepTime.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+        },
+        onBooked: function () { booked = true; }
+      }).then(function () { sending = false; });
     });
 
     body.appendChild(form);
   })();
 
+  var booked = false;
+
   /* -------------------------------------------------------------- render -- */
 
   function render() {
+    if (booked) return;
     var set = pick.services;
 
-    /* Step 1 — a stylist goes dead when they cannot take the whole set. */
     SHOP.staff.forEach(function (p) {
       var node = staffNodes[p.id];
+      if (!node) return;
       var blocked = set.length && !Core.canDoAll(SHOP, p.id, set);
       var cannot = Core.servicesIn(SHOP, set).filter(function (s) {
         return s.staff.indexOf(p.id) === -1;
@@ -333,10 +450,9 @@
       setPicked(node, pick.staff === p.id);
     });
 
-    /* Step 2 — a service goes dead when the chosen stylist does not offer it,
-       or when something already chosen is an alternative to it. */
     SHOP.services.forEach(function (sv) {
       var node = serviceNodes[sv.id];
+      if (!node) return;
       var picked = set.indexOf(sv.id) !== -1;
       var byStaff = pick.staff && !Core.canDo(SHOP, pick.staff, sv.id);
       var byGroup = !picked && Core.clashes(SHOP, set, sv.id);
@@ -362,7 +478,6 @@
     buildDates();
     buildTimes();
 
-    /* Later steps stay closed until the step before them is answered. */
     stepDate.classList.toggle('is-open', set.length > 0);
     stepTime.classList.toggle('is-open', !!(set.length && pick.date));
     stepDetails.classList.toggle('is-open', !!(set.length && pick.date && pick.time));
@@ -374,12 +489,15 @@
         + ' euro · with ' + who + ' · ' + longDate(pick.date) + ' at ' + pick.time;
     }
 
-    var note = form.querySelector('.bnote');
-    if (note) note.textContent = window.BookingProvider.note || '';
+    if (noteNode && !noteNode.getAttribute('role')) {
+      noteNode.textContent = window.BookingProvider.note || '';
+    }
   }
 
   /* --------------------------------------------------------------- boot --- */
 
+  buildStaff();
+  buildServices();
   mount.textContent = '';
   mount.appendChild(stepStaff);
   mount.appendChild(stepService);
@@ -389,4 +507,19 @@
   mount.classList.add('is-live');
   if (reduce) mount.classList.add('no-motion');
   render();
+
+  fetchBusy();
+
+  if (window.UchiCatalog && window.UchiCatalog.load) {
+    window.UchiCatalog.load().then(function (shop) {
+      if (!shop || shop === SHOP || shop.__source !== 'db') return;
+      if (pick.staff || pick.services.length) return;
+      var oldHorizon = horizon();
+      SHOP = shop;
+      buildStaff();
+      buildServices();
+      render();
+      if (horizon() !== oldHorizon) fetchBusy();
+    });
+  }
 })();

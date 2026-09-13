@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UCHI | Gallery</title>
+<meta name="description" content="Work from UCHI, Klapdorp 37, Antwerp.">
+<link rel="canonical" href="gallery">
+<!--
+  UCHI, gallery.
+
+  ISU's COLLECTIONS section as a page of its own: pages of up to six
+  overlapping photographs placed on ISU's measured fragment positions, a small
+  text block where ISU prints "FRAGMENT; NOUN, SINGULAR", and the 1 2 page
+  switcher bottom right. On a phone the same pages stack, as ISU's
+  .collection-mobile does. Photographs come from the gallery_images table
+  (assets/js/gallery.js); what is written below is the empty state, which is
+  also what a visitor without JavaScript sees.
+-->
+<link rel="icon" href="assets/favicon.png" type="image/png">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/js/site.js"></script>
+</head>
+<body class="gallery-page">
+
+<div class="page">
+
+  <div id="curtain" aria-hidden="true"><span class="bck"></span></div>
+
+  <button id="ico-nav" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="main-navigation-mobile">
+    <span class="ln1"></span><span class="ln2"></span><span class="ln3"></span>
+  </button>
+
+  <header class="head">
+    <h1 class="head__title">
+      <a class="head__mark" href="home">
+        <picture>
+          <source type="image/webp" srcset="assets/brand/uchi-logo.webp">
+          <img src="assets/brand/uchi-logo.png" width="648" height="239" alt="UCHI, hair is hair">
+        </picture>
+        <span class="tapa tapa--word" aria-hidden="true"></span>
+        <span class="tapa tapa--line" aria-hidden="true"></span>
+        <span class="tapa tapa--tag" aria-hidden="true"></span>
+      </a>
+    </h1>
+  </header>
+
+  <main id="main-content">
+    <section id="collections" class="is-empty" aria-label="Gallery">
+      <div class="content" id="collections-content">
+        <div class="collections-block collection-mobile is-current" id="collections-block-1">
+          <div class="collections-fragments" id="collections-block-fragments-1">
+            <h2 class="frag__t">GALLERY</h2>
+            <p class="frag__p">New work is on its way.</p>
+          </div>
+        </div>
+      </div>
+      <nav id="collections-nav" aria-label="Gallery pages" hidden></nav>
+    </section>
+  </main>
+
+  <nav id="main-navigation" aria-label="Primary">
+    <ul>
+      <li data-text="INTRO"><a href="home#intro">INTRO</a></li>
+      <li data-text="CONTACT"><a href="home#contact">CONTACT</a></li>
+      <li data-text="GALLERY" class="selected"><a href="gallery" aria-current="page">GALLERY</a></li>
+      <li data-text="RESERVATION"><a href="reservation">RESERVATION</a></li>
+    </ul>
+  </nav>
+
+  <nav id="main-navigation-mobile" aria-label="Primary, mobile">
+    <ul>
+      <li data-text="HOME"><a href="home">HOME</a></li>
+      <li data-text="INTRO"><a href="home#intro">INTRO</a></li>
+      <li data-text="CONTACT"><a href="home#contact">CONTACT</a></li>
+      <li data-text="GALLERY" class="selected"><a href="gallery" aria-current="page">GALLERY</a></li>
+      <li data-text="RESERVATION"><a href="reservation">RESERVATION</a></li>
+    </ul>
+  </nav>
+
+</div>
+
+<script src="assets/vendor/supabase-2.116.0.js"></script>
+<script src="assets/supabase-config.js"></script>
+<script src="assets/js/sb.js"></script>
+<script src="assets/js/gallery.js"></script>
+</body>
+</html>

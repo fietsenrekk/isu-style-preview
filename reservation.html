@@ -48,12 +48,17 @@
 -->
 <link rel="icon" href="assets/favicon.png" type="image/png">
 <link rel="stylesheet" href="assets/site.css">
+<script src="assets/js/site.js"></script>
 </head>
 <body class="reservation">
 
 <div class="page">
 
-  <div id="curtain" class="idle" aria-hidden="true"><span class="bck"></span></div>
+  <div id="curtain" aria-hidden="true"><span class="bck"></span></div>
+
+  <button id="ico-nav" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="main-navigation-mobile">
+    <span class="ln1"></span><span class="ln2"></span><span class="ln3"></span>
+  </button>
 
   <header class="head">
     <h1 class="head__title">
@@ -123,21 +128,34 @@
     <p class="instagram"><a href="https://www.instagram.com/labi_antwerp/" target="_blank" rel="noopener noreferrer">labi_antwerp</a> · <a href="https://www.instagram.com/donovanhairdresser/" target="_blank" rel="noopener noreferrer">donovanhairdresser</a></p>
   </footer>
 
+  <nav id="main-navigation" aria-label="Primary">
+    <ul>
+      <li data-text="INTRO"><a href="home#intro">INTRO</a></li>
+      <li data-text="CONTACT"><a href="home#contact">CONTACT</a></li>
+      <li data-text="GALLERY"><a href="gallery">GALLERY</a></li>
+      <li data-text="RESERVATION" class="selected"><a href="reservation" aria-current="page">RESERVATION</a></li>
+    </ul>
+  </nav>
+
+  <nav id="main-navigation-mobile" aria-label="Primary, mobile">
+    <ul>
+      <li data-text="HOME"><a href="home">HOME</a></li>
+      <li data-text="INTRO"><a href="home#intro">INTRO</a></li>
+      <li data-text="CONTACT"><a href="home#contact">CONTACT</a></li>
+      <li data-text="GALLERY"><a href="gallery">GALLERY</a></li>
+      <li data-text="RESERVATION" class="selected"><a href="reservation" aria-current="page">RESERVATION</a></li>
+    </ul>
+  </nav>
+
 </div>
 
+<script src="assets/vendor/supabase-2.116.0.js"></script>
+<script src="assets/supabase-config.js"></script>
+<script src="assets/js/sb.js"></script>
+<script src="assets/catalog.js"></script>
 <script src="assets/booking-data.js"></script>
 <script src="assets/booking-core.js"></script>
 <script src="assets/booking-provider.js"></script>
 <script src="assets/booking-ui.js"></script>
-<script>
-(function () {
-  var root = document.documentElement;
-  root.className += (root.className ? ' ' : '') + 'js';
-  var page = document.querySelector('.page');
-  requestAnimationFrame(function () {
-    requestAnimationFrame(function () { page.classList.add('is-revealed'); });
-  });
-})();
-</script>
 </body>
 </html>

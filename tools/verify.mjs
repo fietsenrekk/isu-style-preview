@@ -16,7 +16,7 @@ import { rm, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 
-const CHROME = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const CHROME = process.env.VERIFY_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const BASE = (process.env.VERIFY_ORIGIN ?? 'http://localhost:4219').replace(/\/$/, '');
 const SHOTS = process.env.VERIFY_SHOTS ? path.resolve(process.env.VERIFY_SHOTS) : null;
 
@@ -114,7 +114,7 @@ async function goto(url) {
   await send('Page.navigate', { url });
   await evaluate('new Promise(r => { if (document.readyState === "complete") r(1);'
     + ' else addEventListener("load", () => r(1)); })');
-  await new Promise(r => setTimeout(r, 2400));   // clear of the 1.55s reveal
+  await new Promise(r => setTimeout(r, 2600));   // clear of the curtain (.45s) and the reveal (~2.1s)
 }
 async function shot(name) {
   if (!SHOTS) return;
@@ -189,8 +189,8 @@ check(Array.isArray(alpha) && alpha.every(a => a === 0),
 /* Nav wording. */
 const navText = await evaluate(
   `[...document.querySelectorAll('#main-navigation li')].map(n => n.textContent.trim())`);
-check(JSON.stringify(navText) === JSON.stringify(['INTRO', 'CONTACT', 'RESERVATION']),
-  'desktop nav reads INTRO / CONTACT / RESERVATION',
+check(JSON.stringify(navText) === JSON.stringify(['INTRO', 'CONTACT', 'GALLERY', 'RESERVATION']),
+  'desktop nav reads INTRO / CONTACT / GALLERY / RESERVATION',
   'desktop nav is ' + JSON.stringify(navText));
 check(!navText.some(t => /PRICES/i.test(t)), 'PRICES is gone from the nav',
   'PRICES still in the nav');
@@ -201,7 +201,7 @@ check(await evaluate(`!document.getElementById('prices')`),
 
 /* Each section renders and nothing overflows. */
 for (const id of ['home', 'intro', 'contact']) {
-  if (id !== 'home') await click(`#main-navigation [data-sec="${id}"]`, 900);
+  if (id !== 'home') await click(`#main-navigation [data-sec="${id}"]`, 1300);
   const s = await evaluate(`(() => {
     const n = document.getElementById(${JSON.stringify(id)});
     const r = n.getBoundingClientRect();
@@ -314,6 +314,341 @@ const navClash = await evaluate(`(() => {
 })()`);
 check(navClash.hit === false, 'the nav and the photograph do not overlap',
   'nav overlaps the figure: ' + JSON.stringify(navClash));
+
+/* ============================================ one site, every page ===== */
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+/* Poll an expression, tolerating the context being torn down mid-navigation. */
+async function waitFor(expr, ms = 6000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    try { if (await evaluate(expr)) return true; } catch {}
+    await sleep(60);
+  }
+  return false;
+}
+const IDLE = `!/curtain-(cover|in|out)/.test(document.documentElement.className)`;
+const PAGES = ['home', 'gallery', 'reservation'];
+const HREF = { HOME: 'home', INTRO: 'home#intro', CONTACT: 'home#contact',
+               GALLERY: 'gallery', RESERVATION: 'reservation' };
+
+/* --- static audit: strict-CSP readiness and no /admin, in the files ----- */
+{
+  const { readFileSync } = await import('node:fs');
+  const root = path.join(path.dirname((await import('node:url')).fileURLToPath(import.meta.url)), '..');
+  for (const f of ['index.html', 'home.html', 'gallery.html', 'reservation.html']) {
+    const src = readFileSync(path.join(root, f), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+    const inlineScripts = [...src.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+      .filter(m => !/\bsrc\s*=/.test(m[1]) || m[2].trim() !== '');
+    const styleAttr = src.match(/<[^>]+\sstyle\s*=/gi) || [];
+    const handlers = src.match(/<[^>]+\son[a-z]+\s*=/gi) || [];
+    const jsUrls = src.match(/javascript:/gi) || [];
+    const styleTags = src.match(/<style\b/gi) || [];
+    check(inlineScripts.length + styleAttr.length + handlers.length + jsUrls.length + styleTags.length === 0,
+      f + ' has no inline script, style, on* handler or javascript: URL',
+      f + ' is not CSP-clean: ' + JSON.stringify({ inlineScripts: inlineScripts.length,
+        styleAttr, handlers, jsUrls: jsUrls.length, styleTags: styleTags.length }));
+    check(!/href\s*=\s*"[^"]*admin/i.test(src), f + ' never links /admin', f + ' links to admin');
+  }
+}
+
+/* --- the nav, on every page, at desktop and on a phone -------------------- */
+for (const [w, h, mobile] of [[1440, 900, false], [390, 844, true]]) {
+  await viewport(w, h, mobile);
+  for (const p of PAGES) {
+    await goto(BASE + '/' + p);
+    const nav = await evaluate(`(() => {
+      const shown = n => !!n && getComputedStyle(n).display !== 'none';
+      const read = sel => [...document.querySelectorAll(sel + ' li')].map(li => {
+        const a = li.querySelector('a');
+        return [a && a.textContent.trim(), a && a.getAttribute('href'), li.classList.contains('selected')];
+      });
+      const links = [...document.querySelectorAll('a[href]')];
+      return { desk: read('#main-navigation'), mob: read('#main-navigation-mobile'),
+        deskShown: shown(document.getElementById('main-navigation')),
+        burgerShown: shown(document.getElementById('ico-nav')),
+        admin: links.some(a => /admin/i.test(a.getAttribute('href') + ' ' + a.textContent)) };
+    })()`);
+    const label = p + ' @' + w;
+    const want = (items) => items.map(t => [t, HREF[t],
+      (p === 'gallery' && t === 'GALLERY') || (p === 'reservation' && t === 'RESERVATION')
+      || (p === 'home' && t === 'HOME')]);
+    check(JSON.stringify(nav.desk) === JSON.stringify(want(['INTRO', 'CONTACT', 'GALLERY', 'RESERVATION'])),
+      label + ': desktop nav INTRO / CONTACT / GALLERY / RESERVATION, current page marked',
+      label + ': desktop nav is ' + JSON.stringify(nav.desk));
+    check(JSON.stringify(nav.mob) === JSON.stringify(want(['HOME', 'INTRO', 'CONTACT', 'GALLERY', 'RESERVATION'])),
+      label + ': mobile menu HOME / INTRO / CONTACT / GALLERY / RESERVATION, current marked',
+      label + ': mobile menu is ' + JSON.stringify(nav.mob));
+    check(mobile ? (!nav.deskShown && nav.burgerShown) : (nav.deskShown && !nav.burgerShown),
+      label + ': the ' + (mobile ? 'burger' : 'left nav') + ' is the one showing',
+      label + ': wrong nav visible ' + JSON.stringify(nav));
+    check(!nav.admin, label + ': no admin link', label + ': an admin link is on the page');
+  }
+}
+
+/* --- the burger ------------------------------------------------------------ */
+/* The reservation page is the long one on a phone, so scroll lock is observable. */
+await viewport(390, 844, true);
+await goto(BASE + '/reservation');
+
+async function key(k, code, extra = {}) {
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code, windowsVirtualKeyCode: extra.vk, modifiers: extra.mod || 0 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: extra.vk, modifiers: extra.mod || 0 });
+}
+async function tap(x, y) {
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+}
+const menuState = `(() => {
+  const b = document.getElementById('ico-nav'), n = document.getElementById('main-navigation-mobile');
+  const cs = getComputedStyle(n), links = [...n.querySelectorAll('a')];
+  const br = b.getBoundingClientRect();
+  return { cls: document.documentElement.classList.contains('menu-open'),
+    expanded: b.getAttribute('aria-expanded'), vis: cs.visibility, op: cs.opacity,
+    focusIn: n.contains(document.activeElement), focusBurger: document.activeElement === b,
+    htmlOverflow: getComputedStyle(document.documentElement).overflow,
+    liOpacity: [...n.querySelectorAll('li')].map(li => getComputedStyle(li).opacity),
+    linkH: links.map(a => Math.round(a.getBoundingClientRect().height)),
+    burger: [Math.round(br.width), Math.round(br.height)], scrollY: Math.round(scrollY) };
+})()`;
+
+await evaluate(`window.scrollTo(0, 200)`);
+const scrolledTo = await evaluate('Math.round(scrollY)');
+await evaluate(`window.scrollTo(0, 0)`);
+await sleep(100);
+const bRect = await evaluate(`(() => { const r = document.getElementById('ico-nav').getBoundingClientRect();
+  return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+await tap(bRect[0], bRect[1] + 0);
+await sleep(1200);
+let m = await evaluate(menuState);
+check(m.cls && m.expanded === 'true' && m.vis === 'visible' && m.op === '1',
+  'burger opens the menu, aria-expanded="true"', 'menu did not open: ' + JSON.stringify(m));
+check(m.focusIn, 'focus moves into the open menu', 'focus stayed outside the menu');
+check(m.liOpacity.every(o => o === '1'), 'every menu item has faded in', 'menu items: ' + m.liOpacity);
+check(m.htmlOverflow === 'hidden', 'page scroll is locked while the menu is open',
+  'html overflow while open is ' + m.htmlOverflow);
+await send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 200, y: 400, deltaX: 0, deltaY: 500 });
+await sleep(300);
+const wheelY = await evaluate('Math.round(scrollY)');
+check(scrolledTo > 0 && wheelY === 0, 'a wheel/scroll gesture does not move the page under the menu',
+  'the page scrolled under the menu (' + wheelY + ', page scrollable to ' + scrolledTo + ')');
+check(m.linkH.every(hh => hh >= 40) && m.burger[0] >= 40 && m.burger[1] >= 40,
+  'menu links (' + m.linkH.join('/') + 'px) and the burger (' + m.burger.join('x') + ') are 40px+ targets',
+  'tap targets too small: ' + JSON.stringify({ links: m.linkH, burger: m.burger }));
+await shot('m-menu-open');
+
+/* Tab stays inside the burger + links ring. */
+for (let i = 0; i < 7; i++) await key('Tab', 'Tab', { vk: 9 });
+m = await evaluate(menuState);
+check(m.focusIn || m.focusBurger, 'Tab is trapped inside the open menu', 'focus escaped the menu');
+
+await key('Escape', 'Escape', { vk: 27 });
+await sleep(500);
+m = await evaluate(menuState);
+check(!m.cls && m.expanded === 'false' && m.vis === 'hidden',
+  'Escape closes the menu and it ends hidden', 'Escape did not close: ' + JSON.stringify(m));
+check(m.focusBurger, 'focus returns to the burger on close', 'focus did not return to the burger');
+check(m.htmlOverflow !== 'hidden', 'scroll lock is released on close', 'scroll still locked after close');
+
+await tap(bRect[0], bRect[1]);
+await sleep(900);
+await tap(370, 820);   // grey overlay, nowhere near a link
+await sleep(500);
+m = await evaluate(menuState);
+check(!m.cls && m.vis === 'hidden', 'tapping the backdrop closes the menu', 'backdrop tap left it open: ' + JSON.stringify(m));
+
+/* A link in the menu closes it and goes where it says. */
+await tap(bRect[0], bRect[1]);
+await sleep(900);
+const gRect = await evaluate(`(() => { const r = document.querySelector('#main-navigation-mobile a[href="gallery"]').getBoundingClientRect();
+  return [r.left + 20, r.top + r.height / 2]; })()`);
+await tap(gRect[0], gRect[1]);
+check(await waitFor(`location.pathname === '/gallery' && document.readyState === 'complete'`, 8000),
+  'GALLERY in the mobile menu lands on /gallery', 'the mobile menu link did not navigate');
+check(await waitFor(IDLE, 3000), 'the curtain is idle after arriving from the menu', 'curtain stuck after menu nav');
+check(await evaluate(`!document.documentElement.classList.contains('menu-open')`),
+  'the arriving page has its menu closed', 'menu arrived open');
+
+/* --- cross-page navigation from every page, and back ---------------------- */
+for (const [w, h, mobile] of [[1440, 900, false], [390, 844, true]]) {
+  await viewport(w, h, mobile);
+  for (const from of PAGES) {
+    for (const to of ['gallery', 'reservation']) {
+      if (from === to) continue;
+      await goto(BASE + '/' + from);
+      const t0 = Date.now();
+      const navSel = mobile ? '#main-navigation-mobile' : '#main-navigation';
+      await evaluate(`document.querySelector('${navSel} a[href="${to}"]').click()`);
+      const landed = await waitFor(`location.pathname === '/${to}' && document.readyState === 'complete'`, 8000);
+      const idle = landed && await waitFor(IDLE, 3000);
+      const took = Date.now() - t0;
+      check(landed && idle, `@${w} ${from} -> ${to} lands and the curtain ends idle (${took}ms incl. load)`,
+        `@${w} ${from} -> ${to}: landed ${landed}, idle ${idle}`);
+      check(took < 1600, `@${w} ${from} -> ${to} completes its transition in under 1.6s`,
+        `@${w} ${from} -> ${to} took ${took}ms`);
+      if (w === 1440 && from === 'home') {
+        await evaluate('history.back()');
+        const back = await waitFor(`location.pathname === '/home' && document.readyState === 'complete'`, 8000);
+        await sleep(200);
+        const idleBack = back && await waitFor(IDLE, 2000);
+        const revealed = await evaluate(`!!document.querySelector('.page.is-revealed')`).catch(() => false);
+        check(back && idleBack && revealed, `history.back() from ${to} shows home with no stuck curtain`,
+          `after back from ${to}: back ${back}, idle ${idleBack}, revealed ${revealed}`);
+      }
+    }
+  }
+}
+
+/* --- home#contact and home#intro, arriving from another page ---------------- */
+await viewport(1440, 900);
+for (const sec of ['contact', 'intro']) {
+  await goto(BASE + '/gallery');
+  await evaluate(`document.querySelector('#main-navigation a[href="home#${sec}"]').click()`);
+  const landed = await waitFor(`location.pathname === '/home' && document.readyState === 'complete'`, 8000);
+  const coveredOnArrival = landed && await evaluate(`/curtain-(cover|out)/.test(document.documentElement.className)`).catch(() => false);
+  const idle = landed && await waitFor(IDLE, 3000);
+  const st = await evaluate(`({ active: document.querySelector('.section.is-active').id, hash: location.hash,
+    selected: [...document.querySelectorAll('#main-navigation li.selected a')].map(a => a.textContent) })`);
+  check(landed && idle && st.active === sec && st.hash === '#' + sec,
+    `GALLERY -> ${sec.toUpperCase()} arrives on home with #${sec} open`, `arrival on home#${sec}: ` + JSON.stringify({ landed, idle, st }));
+  check(coveredOnArrival, `home#${sec} opens under the curtain, then uncovers (no jump)`,
+    `home#${sec} was not covered on arrival`);
+  check(JSON.stringify(st.selected) === JSON.stringify([sec.toUpperCase()]),
+    `${sec.toUpperCase()} is marked as the current item`, 'selected items: ' + JSON.stringify(st.selected));
+}
+
+/* --- the gallery: empty state, and the composition with photographs ------- */
+
+const fakePhotos = (n) => `Array.from({ length: ${n} }, (_, i) => ({
+  src: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200"><rect width="900" height="1200" fill="hsl(' + (i * 45) + ',0%,' + (20 + i * 8) + '%)"/><text x="450" y="640" font-size="200" text-anchor="middle" fill="#fff">' + (i + 1) + '</text></svg>'),
+  alt: 'test photograph ' + (i + 1) }))`;
+
+for (const [w, h, mobile] of [[1440, 900, false], [1024, 768, false], [768, 1024, false], [390, 844, true], [360, 740, true]]) {
+  await viewport(w, h, mobile);
+  await goto(BASE + '/gallery');
+  const ready = await waitFor(`document.getElementById('collections').classList.contains('is-ready')`, 12000);
+  await sleep(600);
+  const g = await evaluate(`(() => {
+    const s = document.getElementById('collections');
+    const frag = document.querySelector('.collections-block.is-current .collections-fragments');
+    const imgs = [...document.querySelectorAll('#collections img')];
+    return { empty: s.classList.contains('is-empty'),
+      title: frag && frag.querySelector('.frag__t').textContent, body: frag && frag.querySelector('.frag__p').textContent,
+      fragOpacity: getComputedStyle(document.querySelector('#collections .content')).opacity,
+      imgs: imgs.length, broken: imgs.filter(i => !(i.complete && i.naturalWidth > 0)).length,
+      switcher: !document.getElementById('collections-nav').hidden,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+  })()`);
+  const L = 'gallery @' + w + 'x' + h;
+  check(ready && g.empty && g.title === 'GALLERY' && g.body === 'New work is on its way.' && g.fragOpacity === '1',
+    L + ': empty state reads GALLERY / New work is on its way.', L + ': empty state wrong ' + JSON.stringify({ ready, g }));
+  check(g.imgs === 0 && g.broken === 0 && !g.switcher, L + ': no image frames and no page switcher when empty',
+    L + ': stray frames or switcher ' + JSON.stringify(g));
+  check(g.overflow <= 0, L + ': no horizontal overflow', L + ': overflows by ' + g.overflow);
+  if (w === 1440 || w === 390) await shot((mobile ? 'm' : 'd') + '-gallery-empty');
+
+  /* Nine test photographs through the page's own renderer: two pages. */
+  await evaluate(`window.UchiGallery.render(${fakePhotos(9)})`);
+  await sleep(900);
+  const c = await evaluate(`(() => {
+    const R = n => { const r = n.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width }; };
+    const hit = (a, b) => a.w > 0 && b.w > 0 && a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+    const cur = document.querySelector('.collections-block.is-current');
+    const items = [...document.querySelectorAll('.collections-block' + (${mobile} ? '' : '.is-current') + ' .item')];
+    const head = R(document.querySelector('.head')), nav = R(document.getElementById('main-navigation'));
+    const burger = R(document.getElementById('ico-nav')), sw = R(document.getElementById('collections-nav'));
+    const frag = R(cur.querySelector('.collections-fragments'));
+    const clashes = [];
+    items.forEach(it => {
+      const r = R(it);
+      if (hit(r, head)) clashes.push(it.id + ' x header');
+      if (hit(r, nav)) clashes.push(it.id + ' x nav');
+      if (hit(r, sw)) clashes.push(it.id + ' x switcher');
+      if (!${mobile} && hit(r, frag)) clashes.push(it.id + ' x text');
+    });
+    if (hit(frag, head)) clashes.push('text x header');
+    if (hit(frag, nav)) clashes.push('text x nav');
+    if (hit(burger, head)) clashes.push('burger x header');
+    return { pages: document.querySelectorAll('.collections-block').length, onPage: cur.querySelectorAll('.item').length,
+      loaded: items.filter(i => i.classList.contains('is-loaded')).length, items: items.length,
+      buttons: [...document.querySelectorAll('#collections-nav button')].map(b => b.textContent),
+      switcherShown: getComputedStyle(document.getElementById('collections-nav')).display !== 'none',
+      clashes, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      alts: items.every(i => /test photograph/.test(i.querySelector('img').alt)),
+      lazy: items.every(i => i.querySelector('img').loading === 'lazy' && i.querySelector('img').decoding === 'async') };
+  })()`);
+  check(c.pages === 2 && c.onPage === 6, L + ': nine photographs make two pages, six on the first',
+    L + ': pagination wrong ' + JSON.stringify(c));
+  check(c.alts && c.lazy, L + ': alt text carried through, images lazy + async', L + ': alt/lazy wrong');
+  check(mobile ? !c.switcherShown : (c.switcherShown && JSON.stringify(c.buttons) === '["1","2"]'),
+    L + ': page switcher ' + (mobile ? 'hidden on the stacked phone layout' : 'shows 1 2'),
+    L + ': switcher state ' + JSON.stringify(c));
+  check(c.clashes.length === 0, L + ': photographs clear the logo, nav, switcher and text block',
+    L + ': overlaps ' + JSON.stringify(c.clashes));
+  check(c.overflow <= 0, L + ': no horizontal overflow with photographs', L + ': overflows by ' + c.overflow);
+  if (w === 1440 || w === 390) await shot((mobile ? 'm' : 'd') + '-gallery-collage');
+
+  if (!mobile) {
+    await evaluate(`document.querySelectorAll('#collections-nav button')[1].click()`);
+    await sleep(250);
+    const midSwitch = await evaluate(`[...document.querySelectorAll('.collections-block')].map(b => +getComputedStyle(b).opacity)`);
+    await sleep(1700);
+    const sw = await evaluate(`({ op: [...document.querySelectorAll('.collections-block')].map(b => getComputedStyle(b).opacity),
+      vis: [...document.querySelectorAll('.collections-block')].map(b => getComputedStyle(b).visibility),
+      sel: document.querySelector('#collections-nav .selected').textContent })`);
+    check(midSwitch[0] > 0.05 && midSwitch[0] < 0.99,
+      L + ': the page switch cross-fades (page 1 at opacity ' + midSwitch[0].toFixed(2) + ' mid-way)',
+      L + ': the page switch jumped ' + JSON.stringify(midSwitch));
+    check(JSON.stringify(sw.op) === '["0","1"]' && sw.vis[0] === 'hidden' && sw.sel === '2',
+      L + ': switching to 2 settles on page 2', L + ': after switching ' + JSON.stringify(sw));
+    if (w === 1440) await shot('d-gallery-page2');
+  }
+}
+
+/* --- every page, every viewport: overflow, overlap, targets, focus ring ---- */
+const MAIN = { home: '#home .figure', gallery: '.collections-block.is-current .collections-fragments', reservation: '#reservation-box' };
+for (const [w, h, mobile] of [[1440, 900, false], [1024, 768, false], [768, 1024, false], [390, 844, true], [360, 740, true]]) {
+  await viewport(w, h, mobile);
+  for (const p of PAGES) {
+    await goto(BASE + '/' + p);
+    const r = await evaluate(`(() => {
+      const R = s => { const n = document.querySelector(s); if (!n) return null; const r = n.getBoundingClientRect();
+        return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; };
+      const hit = (a, b) => !!a && !!b && a.w > 0 && b.w > 0 && a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
+      const head = R('.head'), nav = R('#main-navigation'), burger = R('#ico-nav'), main = R(${JSON.stringify(MAIN[p])});
+      const clashes = [];
+      if (hit(head, nav)) clashes.push('header x nav');
+      if (hit(head, main)) clashes.push('header x content');
+      if (hit(nav, main)) clashes.push('nav x content');
+      if (hit(burger, head)) clashes.push('burger x header');
+      if (hit(burger, main)) clashes.push('burger x content');
+      return { clashes, main: !!main, burger,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+    })()`);
+    const L = p + ' @' + w + 'x' + h;
+    if (w === 1440 || w === 390) await shot('vp-' + p + '-' + w);
+    check(r.main && r.clashes.length === 0, L + ': logo, nav and content do not overlap',
+      L + ': overlap ' + JSON.stringify(r));
+    check(r.overflow <= 0, L + ': no horizontal overflow', L + ': overflows by ' + r.overflow);
+    if (mobile) {
+      check(r.burger.w >= 40 && r.burger.h >= 40, L + ': burger is a ' + r.burger.w + 'x' + r.burger.h + ' target',
+        L + ': burger only ' + r.burger.w + 'x' + r.burger.h);
+    }
+  }
+}
+
+await viewport(1440, 900);
+await goto(BASE + '/gallery');
+await key('Tab', 'Tab', { vk: 9 });
+const ring = await evaluate(`(() => { const a = document.activeElement; const cs = getComputedStyle(a);
+  return { tag: a.tagName, style: cs.outlineStyle, width: cs.outlineWidth, fv: a.matches(':focus-visible') }; })()`);
+check(ring.fv && ring.style !== 'none' && parseFloat(ring.width) >= 1,
+  'keyboard focus draws a visible focus ring (' + ring.style + ' ' + ring.width + ' on ' + ring.tag + ')',
+  'no visible focus ring: ' + JSON.stringify(ring));
+
+check(consoleErrors.length === 0, 'no console errors on the gallery page', 'console errors: ' + JSON.stringify(consoleErrors));
+
+await viewport(1440, 900);
 
 /* =================================================== the booking page === */
 await goto(BASE + '/reservation');
@@ -607,13 +942,13 @@ await viewport(390, 844, true);
 await goto(BASE + '/home');
 
 for (const id of ['home', 'intro', 'contact']) {
-  await click('#ico-nav', 320);
-  await click(`#main-navigation-mobile [data-sec="${id}"]`, 900);
+  await click('#ico-nav', 700);
+  await click(`#main-navigation-mobile [data-sec="${id}"]`, 1300);
   const s = await evaluate(`(() => {
     const n = document.getElementById(${JSON.stringify(id)});
     return { active: n.classList.contains('is-active'),
              h: Math.round(n.getBoundingClientRect().height),
-             menuOpen: document.getElementById('main-navigation-mobile').classList.contains('open'),
+             menuOpen: document.documentElement.classList.contains('menu-open'),
              overflow: document.documentElement.scrollWidth - 390 };
   })()`);
   check(s.active && s.h > 40, `mobile #${id} renders (${s.h}px)`,
