@@ -26,7 +26,7 @@ const ev=async(e)=>{const{result,exceptionDetails}=await send('Runtime.evaluate'
 
 const fail=[],ok=[];
 await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
-await send('Page.navigate',{url:BASE+'/'});
+await send('Page.navigate',{url:BASE+'/home'});
 await new Promise(r=>setTimeout(r,120));
 
 // Sample the wordmark cover across the reveal.
@@ -72,7 +72,7 @@ else if(!/idle/.test(after.curtain)) fail.push('curtain not parked after the swa
 else ok.push('swap settles clean: contact active, blur cleared, curtain idle');
 
 // Grain present on the hero.
-await send('Page.navigate',{url:BASE+'/'});
+await send('Page.navigate',{url:BASE+'/home'});
 await new Promise(r=>setTimeout(r,1400));
 const grain=await ev("(()=>{const s=getComputedStyle(document.querySelector('#home .figure'),'::after');return {img:s.backgroundImage.slice(0,30),op:s.opacity,blend:s.mixBlendMode};})()");
 if(!/svg/.test(grain.img)) fail.push('no grain layer on the hero');

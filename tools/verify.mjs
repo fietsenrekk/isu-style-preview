@@ -135,7 +135,7 @@ console.log('\nverifying ' + BASE + '\n');
 
 /* ---------------------------------------------------------- desktop ----- */
 await viewport(1440, 900);
-await goto(BASE + '/');
+await goto(BASE + '/home');
 
 check(await evaluate(`document.title.includes('UCHI')`),
   'page is branded UCHI', 'title is not UCHI');
@@ -162,8 +162,8 @@ const logo = await evaluate(`(() => {
 })()`);
 check(logo && logo.complete && logo.w > 0, 'wordmark loaded (' + (logo && logo.nat) + ')',
   'wordmark did not load: ' + JSON.stringify(logo));
-check(logo && Math.abs((logo.w / logo.h) - 3.541) < 0.15,
-  'wordmark keeps its 3.54:1 proportion (' + (logo && (logo.w / logo.h).toFixed(2)) + ')',
+check(logo && Math.abs((logo.w / logo.h) - 2.711) < 0.15,
+  'wordmark keeps its 2.71:1 proportion (' + (logo && (logo.w / logo.h).toFixed(2)) + ')',
   'wordmark is distorted: ' + JSON.stringify(logo));
 check(logo && logo.w >= 160, 'wordmark is legible at ' + (logo && logo.w) + 'px wide',
   'wordmark is only ' + (logo && logo.w) + 'px wide');
@@ -252,10 +252,10 @@ check(JSON.stringify(hours.rows) === JSON.stringify(hours.fromData),
 check(hours.rows.length === 2,
   'the hours are stated in two lines, not seven',
   'expected 2 collapsed rows, got ' + hours.rows.length + ': ' + JSON.stringify(hours.rows));
-check(JSON.stringify(hours.rows[0]) === JSON.stringify(['MON — FRI', '10:00-22:00']),
+check(JSON.stringify(hours.rows[0]) === JSON.stringify(['MON-FRI', '10:00-22:00']),
   'Monday to Friday is one row reading 10:00-22:00',
   'weekday row is ' + JSON.stringify(hours.rows[0]));
-check(JSON.stringify(hours.rows[1]) === JSON.stringify(['SAT — SUN', '/']),
+check(JSON.stringify(hours.rows[1]) === JSON.stringify(['SAT-SUN', '/']),
   'Saturday and Sunday are one closed row',
   'weekend row is ' + JSON.stringify(hours.rows[1]));
 check(!/10:00-22:00[\s\S]*10:00-22:00/.test(
@@ -278,51 +278,33 @@ const clipped = await evaluate(`(() => {
 check(clipped.length === 0, 'no clipped text in the contact section',
   'clipped: ' + JSON.stringify(clipped));
 
-/* ------------------------------------------------- the two-photo hero --- */
-await click('#main-navigation [data-sec="intro"]', 900);
-await goto(BASE + '/');
-const swap0 = await evaluate(`(() => {
-  const on = document.querySelector('.shot.is-on img');
-  return { src: on.currentSrc, idx: [...document.querySelectorAll('.shot')]
-    .findIndex(s => s.classList.contains('is-on')) };
+/* ------------------------------------------------- one photograph ------ */
+await goto(BASE + '/home');
+const hero = await evaluate(`(() => {
+  const imgs = [...document.querySelectorAll('#home .figure img')];
+  const i = imgs[0];
+  return { count: imgs.length, complete: i && i.complete, nat: i && (i.naturalWidth + 'x' + i.naturalHeight),
+           swap: !!document.querySelector('.figure__swap, .figure__cue') };
 })()`);
-await click('.figure__swap', 1000);
-const swap1 = await evaluate(`(() => {
-  const on = document.querySelector('.shot.is-on img');
-  const r = on.getBoundingClientRect();
-  return { src: on.currentSrc, idx: [...document.querySelectorAll('.shot')]
-    .findIndex(s => s.classList.contains('is-on')),
-    complete: on.complete, nat: on.naturalWidth + 'x' + on.naturalHeight,
-    w: Math.round(r.width), h: Math.round(r.height),
-    op: getComputedStyle(on.closest('.shot')).opacity };
-})()`);
-check(swap1.idx === 1 && swap1.src !== swap0.src,
-  'tapping the photograph swaps to the second one',
-  'the photo did not swap: ' + JSON.stringify({ swap0, swap1 }));
-check(swap1.complete && swap1.nat !== '0x0',
-  'the second photograph loaded (' + swap1.nat + ')',
-  'second photograph failed to load: ' + JSON.stringify(swap1));
-check(swap1.op === '1', 'the second photograph is fully faded in',
-  'second photo opacity is ' + swap1.op);
-await shot('d-home-photo2');
+check(hero.count === 1 && !hero.swap, 'the homepage shows one photograph, with no swap',
+  'homepage photo state: ' + JSON.stringify(hero));
+check(hero.complete && hero.nat !== '0x0', 'the photograph loaded (' + hero.nat + ')',
+  'the photograph did not load: ' + JSON.stringify(hero));
+await shot('d-home');
 
-/* The frames must be identical, or the swap would jump the layout. */
-const frame0 = await evaluate(`(() => { const r = document.querySelectorAll('.shot')[0]
-  .getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })()`);
-check(frame0[0] === swap1.w && frame0[1] === swap1.h,
-  'both photographs occupy the identical frame — no layout shift on swap',
-  'frames differ: ' + JSON.stringify(frame0) + ' vs ' + JSON.stringify([swap1.w, swap1.h]));
+/* The root address forwards to /home. */
+await send('Page.navigate', { url: BASE + '/' });
+await new Promise(r => setTimeout(r, 1500));
+const landed = await evaluate('location.pathname');
+check(/\/home$/.test(landed), 'the site root forwards to /home (' + landed + ')',
+  'the root did not forward: ' + landed);
 
-await click('.figure__swap', 1000);
-check(await evaluate(`[...document.querySelectorAll('.shot')]
-  .findIndex(s => s.classList.contains('is-on')) === 0`),
-  'tapping again returns to the first photograph', 'the swap does not cycle back');
-
-check(await evaluate(`getComputedStyle(document.querySelector('.shot')).transition.includes('opacity')`),
-  'the swap is an eased cross-fade, not a cut', 'the photo swap has no transition');
+/* The tagline sits under the rule. */
+const tagCover = await evaluate(`!!document.querySelector('.head .tapa--tag')`);
+check(tagCover, 'the tagline has its own reveal cover', 'no reveal cover for the tagline');
 
 /* The homepage nav sits bottom-left against a centred figure. */
-await goto(BASE + '/');
+await goto(BASE + '/home');
 const navClash = await evaluate(`(() => {
   const n = document.getElementById('main-navigation');
   const f = document.querySelector('#home .figure');
@@ -334,7 +316,7 @@ check(navClash.hit === false, 'the nav and the photograph do not overlap',
   'nav overlaps the figure: ' + JSON.stringify(navClash));
 
 /* =================================================== the booking page === */
-await goto(BASE + '/reservation.html');
+await goto(BASE + '/reservation');
 await shot('d-reservation');
 
 check(await evaluate(`!!document.querySelector('#booking.is-live')`),
@@ -622,7 +604,7 @@ check(consoleErrors.length === 0, 'no console errors through the whole booking f
 
 /* ------------------------------------------------------------ mobile ---- */
 await viewport(390, 844, true);
-await goto(BASE + '/');
+await goto(BASE + '/home');
 
 for (const id of ['home', 'intro', 'contact']) {
   await click('#ico-nav', 320);
@@ -660,7 +642,7 @@ check(!legendHit, 'on a phone the centre rule does not run through the break leg
    narrowest common phone width too, not just 390. */
 for (const w of [390, 360]) {
   await viewport(w, 780, true);
-  await goto(BASE + '/#contact');
+  await goto(BASE + '/home#contact');
   const fit = await evaluate(`(() => {
     const vw = document.documentElement.clientWidth;
     const out = [...document.querySelectorAll('#contact .value, #contact .desc, #contact .legend, #contact a')]
@@ -681,15 +663,8 @@ check(mLogo.w >= 110, 'the wordmark stays legible on a phone (' + mLogo.w + 'px)
 check(mLogo.right <= 390, 'the wordmark does not run off the right edge',
   'wordmark right edge is at ' + mLogo.right + ' of 390');
 
-await goto(BASE + '/');
-await click('.figure__swap', 1000);
-check(await evaluate(`[...document.querySelectorAll('.shot')]
-  .findIndex(s => s.classList.contains('is-on')) === 1`),
-  'the photo swap works on mobile too', 'the photo did not swap on mobile');
-await shot('m-home-photo2');
-
 /* The booking page on a phone. */
-await goto(BASE + '/reservation.html');
+await goto(BASE + '/reservation');
 const mBooking = await evaluate(`(() => ({
   live: !!document.querySelector('#booking.is-live'),
   overflow: document.documentElement.scrollWidth - 390,
@@ -728,7 +703,7 @@ const loaded = new Promise((resolve) => {
   };
   ws.addEventListener('message', onMessage);
 });
-await send('Page.navigate', { url: BASE + '/reservation.html' });
+await send('Page.navigate', { url: BASE + '/reservation' });
 await Promise.race([loaded, new Promise(r => setTimeout(r, 8000))]);
 
 const noJs = await evaluate(`document.querySelectorAll('#booking .item').length + '|'

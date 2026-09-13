@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UCHI | Hair is hair</title>
+<meta name="description" content="UCHI, two hairstylists on Klapdorp in Antwerp. One price list for everyone. Book online.">
+<link rel="canonical" href="home">
+<!--
+  UCHI, home.
+
+  The page composition and interaction model follow isu-antwerp.com. Every
+  measured value, and the places this deliberately diverges from ISU's
+  stylesheet, are documented at the top of assets/site.css.
+
+  COLLECTIONS is intentionally absent from the nav, per the brief. PRICES is
+  gone too: the price list now lives on the reservation page, beside the
+  service it prices, so there is one list rather than two that can disagree.
+
+  The opening hours here are rendered from assets/booking-data.js at load, not
+  typed into this file. Published hours that contradict the hours the booking
+  page will actually sell are the classic failure of a salon site, and the only
+  way to make it impossible is to have one source.
+-->
+<link rel="icon" href="assets/favicon.png" type="image/png">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<div class="page">
+
+  <div id="curtain" class="idle" aria-hidden="true"><span class="bck"></span></div>
+
+  <button id="ico-nav" type="button" aria-label="Menu" aria-expanded="false" aria-controls="main-navigation-mobile">
+    <span class="ln1"></span><span class="ln2"></span><span class="ln3"></span>
+  </button>
+
+  <header class="head">
+    <h1 class="head__title">
+      <a class="head__mark" href="#home" data-sec="home">
+        <picture>
+          <source type="image/webp" srcset="assets/brand/uchi-logo.webp">
+          <img src="assets/brand/uchi-logo.png" width="648" height="239" alt="UCHI, hair is hair">
+        </picture>
+        <span class="tapa tapa--word" aria-hidden="true"></span>
+        <span class="tapa tapa--line" aria-hidden="true"></span>
+        <span class="tapa tapa--tag" aria-hidden="true"></span>
+      </a>
+    </h1>
+  </header>
+
+  <main id="main-content">
+
+    <section class="section is-active" id="home">
+      <figure class="figure">
+        <picture>
+          <source type="image/webp" sizes="(max-width: 759px) 100vw, 46vw" srcset="assets/img/hero-480.webp 480w, assets/img/hero-720.webp 720w, assets/img/hero-1080.webp 1080w, assets/img/hero-1440.webp 1440w">
+          <img src="assets/img/hero-1080.jpg" width="1440" height="1920" decoding="async" alt="Black and white portrait, hair cut short and textured">
+        </picture>
+        <span class="tapa" aria-hidden="true"></span>
+      </figure>
+    </section>
+
+    <section class="section" id="intro" aria-label="Intro">
+      <div class="content">
+        <p>UCHI is two chairs on Klapdorp, and two hairstylists: Labi and Donovan.</p>
+        <p>The room stays open late on purpose. Monday to Friday the door opens at 10:00 and does not close until 22:00, with an hour's rest in the middle of the day. Weekends the chairs are empty.</p>
+        <p>Cuts, colour, balayage and blow-dry. One price list for everyone, following the length of your hair and the work it takes. The full list sits on the reservation page, next to the button that books it.</p>
+        <p>Book the chair and the time is yours.</p>
+      </div>
+    </section>
+
+    <section class="section" id="contact" aria-label="Contact">
+      <div class="box">
+        <span class="rule" aria-hidden="true"></span>
+
+        <div class="item">
+          <p class="desc">UCHI</p>
+          <p class="value"></p>
+        </div>
+        <div class="item">
+          <p class="desc"></p>
+          <p class="value">KLAPDORP 37</p>
+        </div>
+        <div class="item">
+          <p class="desc"></p>
+          <p class="value">2000 ANTWERPEN</p>
+        </div>
+
+        <div class="item mt">
+          <p class="desc">PHONE</p>
+          <p class="value"><a href="tel:+32498803033">+32 498 80 30 33</a></p>
+        </div>
+        <div class="item">
+          <p class="desc">E-MAIL</p>
+          <p class="value">
+            <a href="mailto:info@uchi.be">info@uchi.be</a>
+            <span>Cancel or move an appointment up to 4 hours beforehand.</span>
+          </p>
+        </div>
+
+        <div class="item mt">
+          <p class="desc">SOCIAL</p>
+          <p class="value"></p>
+        </div>
+        <div class="item">
+          <p class="desc">LABI</p>
+          <p class="value"><a href="https://www.instagram.com/labi_antwerp/" target="_blank" rel="noopener noreferrer">@LABI_ANTWERP</a></p>
+        </div>
+        <div class="item">
+          <p class="desc">DONOVAN</p>
+          <p class="value"><a href="https://www.instagram.com/donovanhairdresser/" target="_blank" rel="noopener noreferrer">@DONOVANHAIRDRESSER</a></p>
+        </div>
+
+        <div class="item mt">
+          <p class="desc">OPENING HOURS</p>
+          <p class="value"></p>
+        </div>
+        <!--
+          Rendered from assets/booking-data.js by the script at the foot of this
+          page. The rows below are the no-JavaScript fallback and are replaced
+          wholesale on load; they are written out here so the hours are in the
+          HTML for a reader without scripts, and a test asserts the two agree.
+        -->
+        <div id="hours-rows">
+          <div class="item"><p class="desc">MON-FRI</p><p class="value">10:00-22:00</p></div>
+          <div class="item"><p class="desc">SAT-SUN</p><p class="value">/</p></div>
+        </div>
+        <p class="legend" id="hours-break">Closed for a break 14:00-15:00.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <nav id="main-navigation" aria-label="Primary">
+    <ul>
+      <li data-sec="intro" data-text="INTRO">INTRO</li>
+      <li data-sec="contact" data-text="CONTACT">CONTACT</li>
+      <li data-text="RESERVATION"><a href="reservation">RESERVATION</a></li>
+    </ul>
+  </nav>
+
+  <nav id="main-navigation-mobile" aria-label="Primary, mobile">
+    <ul>
+      <li data-sec="home" data-text="HOME">HOME</li>
+      <li data-sec="intro" data-text="INTRO">INTRO</li>
+      <li data-sec="contact" data-text="CONTACT">CONTACT</li>
+      <li data-text="RESERVATION"><a href="reservation">RESERVATION</a></li>
+    </ul>
+  </nav>
+
+</div>
+
+<script src="assets/booking-data.js"></script>
+<script src="assets/booking-core.js"></script>
+<script>
+(function () {
+  /*
+    Motion is opt-in: the .js class is what switches the covers, the curtain and
+    the blur on. Without this script none of it applies and the page is simply
+    present - no element is ever left hidden by a decoration that failed to run.
+  */
+  var root = document.documentElement;
+  root.className += (root.className ? ' ' : '') + 'js';
+
+  var page = document.querySelector('.page');
+  var curtain = document.getElementById('curtain');
+  var content = document.getElementById('main-content');
+  var sections = document.querySelectorAll('.section');
+  var burger = document.getElementById('ico-nav');
+  var mobileNav = document.getElementById('main-navigation-mobile');
+  var navItems = document.querySelectorAll('[data-sec]');
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- opening hours, painted from the booking data ------------------- */
+
+  /*
+    The same values the booking page sells slots from. Repainting at runtime
+    rather than trusting the markup means the published hours cannot survive a
+    change to booking-data.js that nobody remembered to mirror here.
+  */
+  (function paintHours() {
+    if (!window.SHOP || !window.BookingCore) return;
+    var host = document.getElementById('hours-rows');
+    if (!host) return;
+    host.textContent = '';
+    /* hoursSummary, not hoursRows: consecutive days sharing a value collapse
+       into one range, so the five identical weekday lines become one. */
+    window.BookingCore.hoursSummary(window.SHOP).forEach(function (r) {
+      var item = document.createElement('div');
+      item.className = 'item';
+      var d = document.createElement('p'); d.className = 'desc'; d.textContent = r.label;
+      var v = document.createElement('p'); v.className = 'value'; v.textContent = r.value;
+      item.appendChild(d); item.appendChild(v);
+      host.appendChild(item);
+    });
+    var br = document.getElementById('hours-break');
+    var label = window.BookingCore.breakLabel(window.SHOP);
+    if (br) br.textContent = label ? 'Closed for a break ' + label + '.' : '';
+  })();
+
+  /* ---- the opening reveal (ISU timings live in the stylesheet) --------- */
+
+  function reveal() { page.classList.add('is-revealed'); }
+  // Two frames, so the covers are painted at scaleX(1) before they transition.
+  requestAnimationFrame(function () { requestAnimationFrame(reveal); });
+
+  /* ---- section swap ---------------------------------------------------- */
+
+  function swap(id) {
+    for (var i = 0; i < sections.length; i++) {
+      sections[i].classList.toggle('is-active', sections[i].id === id);
+    }
+    var desktop = document.querySelectorAll('#main-navigation li');
+    for (var j = 0; j < desktop.length; j++) {
+      desktop[j].classList.toggle('selected', desktop[j].dataset.sec === id);
+    }
+    if (history.replaceState) history.replaceState(null, '', id === 'home' ? '#' : '#' + id);
+  }
+
+  var busy = false;
+  function show(id) {
+    if (busy) return;
+    closeMenu();
+    if (reduce || !curtain) { swap(id); return; }
+    busy = true;
+
+    // ISU sweeps a paper curtain in from the left, changes behind it, then
+    // sweeps it away to the right. The blur rides the same beat.
+    curtain.classList.remove('idle', 'sweep-out');
+    content.classList.add('is-shifting');
+    requestAnimationFrame(function () { curtain.classList.add('sweep-in'); });
+
+    setTimeout(function () {
+      swap(id);
+      curtain.classList.remove('sweep-in');
+      curtain.classList.add('sweep-out');
+      content.classList.remove('is-shifting');
+      setTimeout(function () {
+        curtain.classList.add('idle');
+        curtain.classList.remove('sweep-out');
+        busy = false;
+      }, 380);
+    }, 320);
+  }
+
+  /* ---- mobile menu ----------------------------------------------------- */
+
+  function openMenu() {
+    mobileNav.classList.add('open');
+    burger.classList.add('open');
+    burger.setAttribute('aria-expanded', 'true');
+  }
+  function closeMenu() {
+    if (!mobileNav) return;
+    mobileNav.classList.remove('open');
+    burger.classList.remove('open');
+    burger.setAttribute('aria-expanded', 'false');
+  }
+  if (burger) {
+    burger.addEventListener('click', function () {
+      if (mobileNav.classList.contains('open')) closeMenu(); else openMenu();
+    });
+  }
+
+  for (var k = 0; k < navItems.length; k++) {
+    navItems[k].addEventListener('click', function (e) {
+      e.preventDefault();
+      show(this.dataset.sec);
+    });
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && mobileNav && mobileNav.classList.contains('open')) closeMenu();
+  });
+
+  var initial = (location.hash || '').replace('#', '');
+  if (initial && document.getElementById(initial)) swap(initial);
+})();
+</script>
+</body>
+</html>

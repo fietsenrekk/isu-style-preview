@@ -11,7 +11,7 @@
   Run: node tools/booking-test.mjs
 */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -300,12 +300,12 @@ ok('every one of those slots clears the break and the close',
 console.log('\nhours, collapsed');
 const sum = Core.hoursSummary(SHOP);
 check('five identical weekdays collapse to one row', sum.length, 2);
-check('the weekday row', [sum[0].label, sum[0].value], ['MON — FRI', '10:00-22:00']);
-check('the weekend row', [sum[1].label, sum[1].value], ['SAT — SUN', '/']);
+check('the weekday row', [sum[0].label, sum[0].value], ['MON-FRI', '10:00-22:00']);
+check('the weekend row', [sum[1].label, sum[1].value], ['SAT-SUN', '/']);
 ok('the collapsed rows describe exactly the same week as the full ones', (() => {
   const expand = [];
   Core.hoursSummary(SHOP).forEach(g => {
-    const [a, b] = g.label.split(' — ');
+    const [a, b] = g.label.split('-');
     const order = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
     const from = order.indexOf(a), to = b ? order.indexOf(b) : order.indexOf(a);
     for (let i = from; i <= to; i++) expand.push([order[i], g.value]);
@@ -330,7 +330,7 @@ console.log('\nthe price list is genderless');
   tools/ is excluded because this file necessarily contains the very words it
   is searching for.
 */
-const SHIPPED = ['index.html', 'reservation.html', 'README.md',
+const SHIPPED = ['home.html', 'reservation.html', 'index.html', 'README.md',
                  'assets/booking-data.js', 'assets/booking-core.js',
                  'assets/booking-provider.js', 'assets/booking-ui.js',
                  'assets/site.css'];
@@ -370,17 +370,43 @@ for (const file of SHIPPED) {
      hits.join('\n         '));
 }
 check('the shop is called UCHI', SHOP.name, 'UCHI');
-for (const file of ['index.html', 'reservation.html']) {
+for (const file of ['home.html', 'reservation.html']) {
   const html = readFileSync(path.join(root, file), 'utf8');
   ok(file + ' links the phone as tel:+32498803033', html.includes('href="tel:+32498803033"'));
   ok(file + ' links info@uchi.be', html.includes('href="mailto:info@uchi.be"'));
   ok(file + " links Donovan's Instagram", html.includes('instagram.com/donovanhairdresser/'));
   ok(file + ' uses the UCHI wordmark', html.includes('assets/brand/uchi-logo.webp')
-     && html.includes('width="648" height="183"'));
+     && html.includes('width="648" height="239"'));
 }
 ok('the booking inbox is the domain address',
    readFileSync(path.join(root, 'assets/booking-provider.js'), 'utf8')
      .includes("var INBOX = 'info@uchi.be';"));
+
+console.log('\nclean page addresses and plain copy');
+const home = readFileSync(path.join(root, 'home.html'), 'utf8');
+const resv = readFileSync(path.join(root, 'reservation.html'), 'utf8');
+const idx = readFileSync(path.join(root, 'index.html'), 'utf8');
+ok('home links to /reservation, not reservation.html',
+   home.includes('href="reservation"') && !/href="[^"]*\.html/.test(home));
+ok('reservation links back to /home, not index.html',
+   resv.includes('href="home"') && !/href="[^"]*\.html/.test(resv));
+ok('the site root forwards to home', idx.includes('url=home') && idx.includes("location.replace('home'"));
+ok('the homepage has one photograph and no swap',
+   !/hero2|figure__swap|TAP TO SWAP/.test(home) && (home.match(/<picture>/g) || []).length === 2);
+ok('the second photograph files are gone',
+   !['hero2-480.webp', 'hero2-720.webp', 'hero2-1080.webp', 'hero2-1440.webp', 'hero2-1080.jpg']
+     .some(f => existsSync(path.join(root, 'assets/img', f))));
+/* No em dash in anything a visitor reads: page text, attribute values, and
+   strings the scripts put on the page or into the booking e-mail. Comments
+   are not shown, so they are skipped. */
+const visible = (src) => src.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+for (const [f, src] of [['home.html', home], ['reservation.html', resv],
+  ['assets/booking-ui.js', readFileSync(path.join(root, 'assets/booking-ui.js'), 'utf8')],
+  ['assets/booking-provider.js', readFileSync(path.join(root, 'assets/booking-provider.js'), 'utf8')],
+  ['assets/booking-core.js', readFileSync(path.join(root, 'assets/booking-core.js'), 'utf8')]]) {
+  const lines = visible(src).split('\n').filter(l => l.includes('\u2014') && !/^\s*\/\//.test(l));
+  ok('no em dash in anything ' + f + ' shows', lines.length === 0, lines.map(l => l.trim().slice(0, 70)).join('\n         '));
+}
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

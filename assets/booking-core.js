@@ -268,7 +268,7 @@
 
   /*
     The same seven rows, with consecutive days that share a value collapsed into
-    one range: five identical weekday lines become "MON — FRI  10:00-22:00".
+    one range: five identical weekday lines become "MON-FRI  10:00-22:00".
     Five rows saying the same thing is five chances to read the same fact, which
     is four more than anyone needs.
 
@@ -287,7 +287,7 @@
     if (current) runs.push(current);
     return runs.map(function (g) {
       return {
-        label: g.start === g.end ? g.start.label : g.start.label + ' — ' + g.end.label,
+        label: g.start === g.end ? g.start.label : g.start.label + '-' + g.end.label,
         value: g.value,
         open: g.open
       };

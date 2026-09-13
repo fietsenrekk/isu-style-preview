@@ -183,9 +183,9 @@
     body.appendChild(total);
 
     body.appendChild(el('p', 'step__hint legend',
-      'Pick as many as go together — a cut, a colour and a wash are one visit. '
-      + 'One list for everyone: prices are in euro and follow the length of your '
-      + 'hair and the work it takes.'));
+      'Choose one or more services. A cut, a colour and a wash can be booked in '
+      + 'the same visit. Prices are in euro and depend on the length of your hair '
+      + 'and the work involved. Everyone pays the same.'));
   })();
 
   /* ------------------------------------------------------------- step 3 --- */
@@ -200,7 +200,7 @@
     var days = Core.bookableDays(SHOP, mins, new Date(), 10);
     if (!days.length) {
       dateStrip.appendChild(el('p', 'step__hint',
-        'That combination is longer than a single day allows — please call the salon.'));
+        'That combination does not fit in one day. Please call the salon.'));
       return;
     }
     days.forEach(function (d) {
@@ -345,7 +345,7 @@
       })[0] : null;
       setDisabled(node, !!(byStaff || byGroup),
         byStaff ? Core.staffMember(SHOP, pick.staff).name + ' does not do ' + sv.name
-        : byGroup ? 'Already booking ' + other.name + ' — choose one or the other'
+        : byGroup ? 'You already chose ' + other.name + '. Pick one of the two.'
         : '');
       setPicked(node, picked);
     });

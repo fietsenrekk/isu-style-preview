@@ -112,7 +112,7 @@ window.BookingProvider = (function () {
 
   /* Shown under the submit button so the visitor knows what pressing it does
      before they press it. Read by booking-ui.js. */
-  var note = 'This sends your request to the salon by e-mail — they confirm '
+  var note = 'This sends your request to the salon by e-mail. The salon confirms '
            + 'the appointment. Nothing is charged and nothing is booked '
            + 'automatically.';
 
@@ -129,7 +129,7 @@ window.BookingProvider = (function () {
        they have to unpick. */
     b.services.forEach(function (s, i) {
       lines.push((i === 0 ? 'Services  : ' : '            ')
-        + s.name + ' (' + s.nl + ') — ' + s.price + ' euro, ' + s.minutes + ' min');
+        + s.name + ' (' + s.nl + '): ' + s.price + ' euro, ' + s.minutes + ' min');
     });
 
     lines.push(
@@ -147,7 +147,7 @@ window.BookingProvider = (function () {
   }
 
   function submit(booking, form) {
-    var subject = booking.shop + ' — ' + booking.serviceName + ', '
+    var subject = booking.shop + ' | ' + booking.serviceName + ', '
                 + booking.dateLabel + ' ' + booking.time;
     var body = compose(booking);
 
@@ -183,7 +183,7 @@ window.BookingProvider = (function () {
     var alt = document.createElement('p');
     alt.className = 'step__hint';
     alt.textContent = 'Or copy the text above and send it to ' + INBOX
-      + ' — or just call the salon.';
+      + ', or call the salon.';
     done.appendChild(alt);
 
     form.parentNode.replaceChild(done, form);

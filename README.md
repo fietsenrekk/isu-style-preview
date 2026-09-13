@@ -10,6 +10,11 @@ two-column list with a rule down its centre — carrying the UCHI wordmark.
 INTRO and CONTACT swap in place on the homepage; RESERVATION is a separate
 page. That is exactly how the reference site behaves.
 
+Pages live at clean addresses: `/home` (`home.html`) and `/reservation`
+(`reservation.html`). GitHub Pages serves `.html` files without the extension,
+and every internal link uses the extensionless form. The site root
+(`index.html`) forwards to `/home`, keeping any `#section` in the address.
+
 Everything was measured off the live reference (its source HTML, its
 `css/style.css`, and computed styles read in the browser) rather than eyeballed.
 The measurements, and the places this deliberately diverges, are documented at
@@ -23,7 +28,7 @@ the top of `assets/site.css`.
    all. The domain has to be acquired from its current holder (it cannot simply
    be registered), then a mailbox set up on it. **Until then every booking
    request and every e-mail from the site bounces.** The address is in
-   `index.html`, `reservation.html` and `assets/booking-provider.js` (`INBOX`).
+   `home.html`, `reservation.html` and `assets/booking-provider.js` (`INBOX`).
 2. **Pointing the domain at GitHub Pages.** Once `uchi.be` is UCHI's, add a
    `CNAME` file containing `uchi.be` to the `gh-pages` branch, set the DNS
    records GitHub documents for apex domains, and enable HTTPS in the
@@ -31,11 +36,10 @@ the top of `assets/site.css`.
    it breaks the current github.io address until it resolves.
 3. **Fallback if `uchi.be` can't be bought:** `uchi-antwerp.be` was unregistered
    on 2026-09-13. Switching is a find-and-replace of the address.
-4. **The two homepage photographs are other people's.** The first came from
-   @joruhairstudio's Instagram and the second from another Instagram post.
-   They were fine for a preview; on a live commercial site they need the
-   owners' permission, or UCHI's own photographs in their place. Both slots are
-   3:4 and swap without layout changes.
+4. **The homepage photograph is someone else's.** It came from
+   @joruhairstudio's Instagram. That was fine for a preview; on a live
+   commercial site it needs the owner's permission, or a UCHI photograph in its
+   place. The slot is 3:4.
 5. **Still stand-in:** the address (Klapdorp 37) and Labi's Instagram
    (`labi_antwerp`) carried over from the earlier build. Confirm both.
 
@@ -108,18 +112,18 @@ only leaves the stylist a gap.
 
 ## Assets
 
-- **Logo** — UCHI set in Helvetica Bold, 648×183. The letters are rendered
-  from the font file one glyph at a time so the approved letter spacing, rule
-  gap, rule thickness and rule length (measured off the earlier artwork as
-  multiples of the cap height) are kept exactly; only the typeface changed.
-  Transparent, cropped to the ink with a 2% margin; WebP keeps the alpha
-  (`yuva420p`). The reveal covers sit on its two
-  ink bands, measured off the shipped file.
+- **Logo** — UCHI in Helvetica Bold over a rule, with "hair is hair" in
+  Helvetica Regular right-aligned to the rule's end underneath, 648×239. The
+  capitals are rendered from the font file one glyph at a time so the approved
+  letter spacing and rule proportions are kept exactly. The tagline is baked
+  into the image rather than set as live text, because Helvetica is a licensed
+  font and serving the .ttf from a public site would distribute it.
+  Transparent, WebP keeps the alpha (`yuva420p`). Three reveal covers sit on
+  its three ink bands, measured off the shipped file.
 - **Favicon** — the wordmark centred on `#fcfcfc`, composited in Node so the
   paper is exact.
-- **Hero** — two portraits that cross-fade on tap, both 1440×1920, EXIF
-  stripped, WebP at 480/720/1080/1440 with a JPEG fallback. See the
-  photograph-rights note above.
+- **Hero** — one portrait, 1440×1920, EXIF stripped, WebP at
+  480/720/1080/1440 with a JPEG fallback. See the photograph-rights note above.
 - **Fonts** — Bebas Neue and Abel, both OFL, self-hosted WOFF2. Licences ship
   alongside them in `assets/fonts/`.
 - **Zero third-party requests.** No CDN, no analytics, no cookies, on either
@@ -130,7 +134,7 @@ only leaves the stylist a gap.
 ```
 powershell -File ../serve-isu-preview.ps1
 ```
-→ http://localhost:4219/
+→ http://localhost:4219/home
 
 No build step — static HTML.
 

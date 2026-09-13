@@ -3,7 +3,7 @@
   ====
 
   The page composition and interaction model follow isu-antwerp.com, carrying
-  the UCHI wordmark and two portraits that cross-fade on tap.
+  the UCHI wordmark and its tagline.
 
   Every value here was measured off the live ISU site (its source HTML, its
   css/style.css, and computed styles read in the browser) on 2026-08-17 —
@@ -95,9 +95,10 @@ a { color: inherit; text-decoration: none; }
   position: absolute;
   top: 50px;
   right: 100px;
-  max-width: 200px;   /* the UCHI lockup is 648x183, 3.54:1 - four
-                         Helvetica Bold capitals over a rule. At 200px the caps stand about
-                         40px tall, which reads as a mark rather than a
+  max-width: 200px;   /* the UCHI lockup is 648x239: four Helvetica Bold
+                         capitals over a rule, with "hair is hair" in
+                         Helvetica Regular right-aligned under it. At 200px
+                         the caps stand about 40px tall, a mark rather than a
                          headline, in ISU's register */
   text-align: right;
   z-index: 900;
@@ -135,51 +136,6 @@ a { color: inherit; text-decoration: none; }
   object-fit: cover;   /* frame matches the source ratio, so this crops nothing */
   object-position: 50% 50%;
   display: block;
-}
-
-/*
-  Two photographs occupying one frame. Both are 3:4 and both are absolutely
-  positioned in the same box, so the cross-fade moves no layout at all - the
-  frame's height is fixed by its aspect-ratio whichever photo is showing.
-
-  The swap target is a real <button> filling the frame, so it is reachable by
-  keyboard and announces the photograph it moved to.
-*/
-#home .figure__swap {
-  display: block;
-  position: relative;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  overflow: hidden;
-}
-#home .shot {
-  position: absolute;
-  inset: 0;
-  display: block;
-  opacity: 0;
-  transition: opacity 0.75s var(--ease2);
-}
-#home .shot.is-on { opacity: 1; }
-#home .shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-/* A quiet instruction, in the grey of the nav wipe. It sits under
-   the frame rather than over the photograph so nothing is obscured. */
-.figure__cue {
-  margin: 14px auto 0;
-  text-align: center;
-  font-family: var(--display);
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  color: var(--grey);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #home .shot { transition: none; }
 }
 
 /* -------------------------------------------------------------- #intro ---- */
@@ -660,16 +616,9 @@ a { color: inherit; text-decoration: none; }
     padding: 150px 0 60px;
   }
 
-  /*
-    Full bleed at the photographs' own 3:4 - no crop on a phone either.
-
-    The aspect-ratio has to STAY here. Both photographs are absolutely
-    positioned so they can cross-fade in place, which leaves the frame with no
-    child to take its height from; releasing the ratio collapses the whole
-    section to the height of the caption underneath it.
-  */
+  /* Full bleed at the photograph's own 3:4 - no crop on a phone either. */
   #home .figure { width: 100%; height: auto; aspect-ratio: 1440 / 1920; }
-  #home .shot img { height: 100%; object-fit: cover; }
+  #home .figure img { height: 100%; object-fit: cover; }
 
   #intro .content { width: 80%; }
 
@@ -724,15 +673,16 @@ a { color: inherit; text-decoration: none; }
      h2 .cov      0.65s  scaleX 1 -> 0, origin right, ease1, at t+1.60
 
    The UCHI lockup is one image where ISU's is four layered pieces, so the
-   covers sit over its two ink regions. Measured off the shipped 648x183 file
-   by scanning its alpha channel row by row:
+   covers sit over its three ink regions. Measured off the shipped 648x239
+   file by scanning its alpha channel row by row:
 
-     wordmark  y  6.56% - 76.50%,  x 2.62% - 68.06%
-     rule      y 85.25% - 93.44%,  x 1.85% - 98.15%
+     wordmark  y  5.02% - 58.58%,  x  2.62% - 68.06%
+     rule      y 65.27% - 71.55%,  x  1.85% - 98.15%
+     tagline   y 79.92% - 94.98%,  x 64.51% - 98.15%
 
    The covers below are set slightly outside those bounds so no hairline of
-   ink is left showing at the start of the wipe. There are two beats here
-   rather than ISU's four because there are two marks, not four.
+   ink is left showing at the start of the wipe. Three beats rather than ISU's
+   four: rule, wordmark, tagline.
 ========================================================================== */
 
 .tapa {
@@ -745,10 +695,11 @@ a { color: inherit; text-decoration: none; }
 }
 .head__mark { position: relative; }
 
-/* Measured regions of the 648x183 lockup, as percentages. The seam between
-   the two covers sits in the clear gap at 81%. */
-.tapa--word { left: 0; top: 2%;  width: 72%;  height: 79%; }
-.tapa--line { left: 0; top: 81%; width: 101%; height: 18%; }
+/* Measured regions of the 648x239 lockup, as percentages. Each seam sits in
+   the clear gap between two bands. */
+.tapa--word { left: 0;   top: 1%;  width: 72%;  height: 61%; }
+.tapa--line { left: 0;   top: 62%; width: 101%; height: 13%; }
+.tapa--tag  { left: 62%; top: 75%; width: 39%;  height: 24%; }
 
 /* The hero carries one cover, as ISU's #home figure .tapa does. */
 #home .figure .tapa { left: 0; top: 0; width: 101%; height: 101%; }
@@ -760,9 +711,11 @@ a { color: inherit; text-decoration: none; }
 .js .tapa.is-revealed { transform: scaleX(0); }
 
 /* ISU's own numbers: the rule draws first and longest, the wordmark follows
-   it out. Their third and fourth beats have nothing to uncover here. */
+   it out, and the tagline closes on ISU's h2 beat (0.65s, ease1). */
 .js .head .tapa--line { transition-duration: 1.15s; transition-delay: 0s; }
 .js .head .tapa--word { transition-duration: 0.85s; transition-delay: 0.70s;
+                        transition-timing-function: var(--ease1); }
+.js .head .tapa--tag  { transition-duration: 0.65s; transition-delay: 1.00s;
                         transition-timing-function: var(--ease1); }
 #home .figure .tapa    { transition-duration: 1.15s; transition-delay: 0.35s; }
 
