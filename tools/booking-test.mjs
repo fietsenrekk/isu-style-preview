@@ -357,5 +357,30 @@ check('highlights start at 60', Core.priceLabel(Core.service(SHOP, 'highlights')
 ok('every price the site can print is free of gendered wording',
    SHOP.services.every(s => !BANNED.some(re => re.test(s.name) || re.test(s.nl) || re.test(s.id))));
 
+console.log('\nthe final brand and contact details');
+const RETIRED = [/jill/i, /scutt/i, /\bkiru\b/i, /alabivof/i, /468 ?56 ?23 ?24/, /468562324/,
+                 /preview-flag/, /PREVIEW MOCKUP/, /noindex/];
+for (const file of SHIPPED) {
+  const text = readFileSync(path.join(root, file), 'utf8');
+  const hits = [];
+  text.split('\n').forEach((line, i) => {
+    RETIRED.forEach(re => { if (re.test(line)) hits.push((i + 1) + ': ' + line.trim().slice(0, 70)); });
+  });
+  ok('no retired brand, contact detail or preview marker in ' + file, hits.length === 0,
+     hits.join('\n         '));
+}
+check('the shop is called UCHI', SHOP.name, 'UCHI');
+for (const file of ['index.html', 'reservation.html']) {
+  const html = readFileSync(path.join(root, file), 'utf8');
+  ok(file + ' links the phone as tel:+32498803033', html.includes('href="tel:+32498803033"'));
+  ok(file + ' links info@uchi-antwerp.be', html.includes('href="mailto:info@uchi-antwerp.be"'));
+  ok(file + " links Donovan's Instagram", html.includes('instagram.com/donovanhairdresser/'));
+  ok(file + ' uses the UCHI wordmark', html.includes('assets/brand/uchi-logo.webp')
+     && html.includes('width="648" height="186"'));
+}
+ok('the booking inbox is the domain address',
+   readFileSync(path.join(root, 'assets/booking-provider.js'), 'utf8')
+     .includes("var INBOX = 'info@uchi-antwerp.be';"));
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

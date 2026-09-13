@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
-  End-to-end verification for the JILL SCUTT preview.
+  End-to-end verification for the UCHI site.
 
   Drives a real headless Chrome over the DevTools Protocol and clicks the site
   the way a visitor would: swaps the hero photograph, walks the whole booking
@@ -137,8 +137,19 @@ console.log('\nverifying ' + BASE + '\n');
 await viewport(1440, 900);
 await goto(BASE + '/');
 
-check(await evaluate(`document.title.includes('JILL SCUTT')`),
-  'page is branded JILL SCUTT', 'title is not JILL SCUTT');
+check(await evaluate(`document.title.includes('UCHI')`),
+  'page is branded UCHI', 'title is not UCHI');
+
+/* This is the live site: no mockup marker, no instruction to search engines to
+   stay away, and none of the brands it replaced. */
+const finalSite = await evaluate(`(() => ({
+  flag: !!document.querySelector('.preview-flag'),
+  noindex: !!document.querySelector('meta[name=robots][content*=noindex]'),
+  old: /jill|scutt|kiru|mockup/i.test(document.documentElement.outerHTML)
+}))()`);
+check(!finalSite.flag, 'no PREVIEW MOCKUP marker on the page', 'the preview marker is still on the page');
+check(!finalSite.noindex, 'the page is indexable (no noindex)', 'the page still tells search engines to stay away');
+check(!finalSite.old, 'no trace of the earlier brand names or the word mockup', 'an old brand name survives in the markup');
 
 /* The wordmark: present, right shape, and not sitting in a white box. */
 const logo = await evaluate(`(() => {
@@ -151,10 +162,10 @@ const logo = await evaluate(`(() => {
 })()`);
 check(logo && logo.complete && logo.w > 0, 'wordmark loaded (' + (logo && logo.nat) + ')',
   'wordmark did not load: ' + JSON.stringify(logo));
-check(logo && Math.abs((logo.w / logo.h) - 9.093) < 0.35,
-  'wordmark keeps its 9.09:1 proportion (' + (logo && (logo.w / logo.h).toFixed(2)) + ')',
+check(logo && Math.abs((logo.w / logo.h) - 3.484) < 0.15,
+  'wordmark keeps its 3.48:1 proportion (' + (logo && (logo.w / logo.h).toFixed(2)) + ')',
   'wordmark is distorted: ' + JSON.stringify(logo));
-check(logo && logo.w >= 240, 'wordmark is legible at ' + (logo && logo.w) + 'px wide',
+check(logo && logo.w >= 160, 'wordmark is legible at ' + (logo && logo.w) + 'px wide',
   'wordmark is only ' + (logo && logo.w) + 'px wide');
 
 /* Transparency: the pixel just inside the logo box, away from ink, must be the
@@ -203,6 +214,29 @@ for (const id of ['home', 'intro', 'contact']) {
     `desktop #${id} overflows by ${s.overflow}px`);
 }
 await shot('d-contact');
+
+/* The final contact details, as links a phone can act on. */
+const contact = await evaluate(`(() => {
+  const s = document.getElementById('contact');
+  return {
+    tel: [...s.querySelectorAll('a[href^="tel:"]')].map(a => [a.getAttribute('href'), a.textContent.trim()]),
+    mail: [...s.querySelectorAll('a[href^="mailto:"]')].map(a => a.getAttribute('href')),
+    ig: [...s.querySelectorAll('a[href*="instagram.com"]')].map(a => [a.getAttribute('href'), a.textContent.trim()]),
+    text: s.innerText
+  };
+})()`);
+check(JSON.stringify(contact.tel) === JSON.stringify([['tel:+32498803033', '+32 498 80 30 33']]),
+  'the phone is 0498 80 30 33, as a tappable tel: link',
+  'phone links are ' + JSON.stringify(contact.tel));
+check(JSON.stringify(contact.mail) === JSON.stringify(['mailto:info@uchi-antwerp.be']),
+  'the e-mail is info@uchi-antwerp.be', 'mail links are ' + JSON.stringify(contact.mail));
+check(JSON.stringify(contact.ig) === JSON.stringify([
+        ['https://www.instagram.com/labi_antwerp/', '@LABI_ANTWERP'],
+        ['https://www.instagram.com/donovanhairdresser/', '@DONOVANHAIRDRESSER']]),
+  'both Instagram accounts are listed, Labi first and Donovan second',
+  'instagram links are ' + JSON.stringify(contact.ig));
+check(!/468|alabivof/.test(contact.text), 'none of the old contact details remain',
+  'an old phone number or address survives on the contact section');
 
 /* Opening hours: what is published must equal what booking-data holds. */
 const hours = await evaluate(`(() => {
@@ -608,9 +642,41 @@ for (const id of ['home', 'intro', 'contact']) {
 }
 await shot('m-contact');
 
+/*
+  On a phone the contact box is full width, so anything centred in it sits on
+  the rule. The break legend did exactly that - the rule struck through the
+  middle of the sentence - and no overflow or clipping check notices a line
+  drawn through text.
+*/
+const legendHit = await evaluate(`(() => {
+  const l = document.getElementById('hours-break'), r = document.querySelector('#contact .rule');
+  const a = l.getBoundingClientRect(), b = r.getBoundingClientRect();
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+})()`);
+check(!legendHit, 'on a phone the centre rule does not run through the break legend',
+  'the centre rule strikes through the break legend on mobile');
+
+/* The longest value on the site is @DONOVANHAIRDRESSER. Check it on the
+   narrowest common phone width too, not just 390. */
+for (const w of [390, 360]) {
+  await viewport(w, 780, true);
+  await goto(BASE + '/#contact');
+  const fit = await evaluate(`(() => {
+    const vw = document.documentElement.clientWidth;
+    const out = [...document.querySelectorAll('#contact .value, #contact .desc, #contact .legend, #contact a')]
+      .filter(n => n.getBoundingClientRect().right > vw + 0.5)
+      .map(n => n.textContent.trim().slice(0, 30));
+    return { out, overflow: document.documentElement.scrollWidth - vw };
+  })()`);
+  check(fit.out.length === 0 && fit.overflow <= 0,
+    'every contact line, including @DONOVANHAIRDRESSER, fits at ' + w + 'px',
+    'contact overflows at ' + w + 'px: ' + JSON.stringify(fit));
+}
+await viewport(390, 844, true);
+
 const mLogo = await evaluate(`(() => { const r = document.querySelector('.head__mark img')
   .getBoundingClientRect(); return { w: Math.round(r.width), right: Math.round(r.right) }; })()`);
-check(mLogo.w >= 150, 'the wordmark stays legible on a phone (' + mLogo.w + 'px)',
+check(mLogo.w >= 110, 'the wordmark stays legible on a phone (' + mLogo.w + 'px)',
   'wordmark is only ' + mLogo.w + 'px on mobile');
 check(mLogo.right <= 390, 'the wordmark does not run off the right edge',
   'wordmark right edge is at ' + mLogo.right + ' of 390');

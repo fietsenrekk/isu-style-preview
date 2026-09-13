@@ -1,11 +1,11 @@
-# JILL SCUTT — ISU-style preview
+# UCHI — hair, Antwerp
 
-A visual-direction pitch mockup. Not a live business site.
+Two hairstylists on Klapdorp, Antwerp: Labi and Donovan.
 
-Reproduces the page composition **and interaction model** of
+The page composition **and interaction model** follow
 [isu-antwerp.com](https://www.isu-antwerp.com/) — logo placement, the two
 typefaces, the vertical left-hand nav, the centred hero, and the signature
-two-column list with a rule down its centre — carrying the JILL SCUTT wordmark.
+two-column list with a rule down its centre — carrying the UCHI wordmark.
 
 INTRO and CONTACT swap in place on the homepage; RESERVATION is a separate
 page. That is exactly how the reference site behaves.
@@ -15,47 +15,69 @@ Everything was measured off the live reference (its source HTML, its
 The measurements, and the places this deliberately diverges, are documented at
 the top of `assets/site.css`.
 
-## ⚠ The contact details are Labi's, not JILL SCUTT's
+## ⚠ Before this goes live on its own domain
 
-The address, phone number, email, Instagram handle and the inbox the booking
-form writes to belong to **Labi** (Klapdorp 37, Antwerp) and are used here as
-stand-in filler, by request. **They are live.** Anyone who taps the phone
-number or sends a booking request reaches Labi. Replace them before this is
-shown anywhere it could be mistaken for real contact information.
+1. **The domain is `uchi-antwerp.be`, not `uchi.be`.** `uchi.be` was checked on
+   2026-09-13 and is already registered to someone else (since 2023-09-28,
+   parked at one.com, publishing a null MX so it accepts no mail at all).
+   `uchi-antwerp.be` returned *domain not found* at DNS Belgium the same day —
+   unregistered — and mirrors ISU's own `isu-antwerp.com`. Register it before
+   anyone else does.
+2. **`info@uchi-antwerp.be` does not exist until the domain does.** The contact
+   section, the reservation page and the booking form all send mail there.
+   Until the domain is registered and a mailbox is set up on it, **every
+   booking request bounces**. That is the single thing that must happen before
+   the site is announced. The address is in `index.html`, `reservation.html`
+   and `assets/booking-provider.js` (`INBOX`).
+3. **Pointing the domain at GitHub Pages.** Add a `CNAME` file containing
+   `uchi-antwerp.be` to the `gh-pages` branch, set the DNS records GitHub
+   documents for apex domains, and enable HTTPS in the repository's Pages
+   settings. Do not add the `CNAME` before the DNS exists — it breaks the
+   current github.io address until it resolves.
+4. **The two homepage photographs are other people's.** The first came from
+   @joruhairstudio's Instagram and the second from another Instagram post.
+   They were fine for a preview; on a live commercial site they need the
+   owners' permission, or UCHI's own photographs in their place. Both slots are
+   3:4 and swap without layout changes.
+5. **Still stand-in:** the address (Klapdorp 37) and Labi's Instagram
+   (`labi_antwerp`) carried over from the earlier build. Confirm both.
+
+## Contact details
+
+| | |
+|---|---|
+| Phone | +32 498 80 30 33 (`tel:+32498803033`) |
+| E-mail | info@uchi-antwerp.be — see above |
+| Instagram | @labi_antwerp · @donovanhairdresser |
 
 ## Booking
 
 The reservation page implements the booking itself, in the site's own
 typography, rather than embedding a third-party widget. Four choices —
 stylist, services, day, time — then a details form. Services are a set, not
-one item: a cut and a colour and a wash are one visit, while two ways of
-pricing the same cut are not, which is what the `group` field on each service
-expresses.
+one item: a cut and a colour and a wash are one visit, while two colour
+processes are not, which is what the `group` field on each service expresses.
 
 **Why not the widget ISU uses.** ISU's reservation page is a single iframe
 pointing at **onlineafspraken.nl**. It does embed cross-origin
 (`x-frame-options: ALLOWALL`), so that is not the obstacle. The obstacle is the
 `key` in their URL: it names *ISU's own diary*. Embedding it here would send
-this salon's customers into a competitor's calendar. That is not a styling
-problem and restyling the colours does not fix it.
+UCHI's customers into a competitor's calendar.
 
-**What it would take to go live.** An onlineafspraken.nl account on the
-**Groei** tier — €32,50/month billed annually, €40,00 monthly, 2–10 resources,
-14-day free trial, no free tier. That tier lists *"widgets per resource"*,
-which is exactly the Labi/Donovan split: their platform scopes staff lists per
-appointment-type group, so a stylist who does not perform a service simply does
-not appear in that service's picker. ISU's own live widget shows this — two
-pickers, *"Cut or blowdry by"* and *"Color by"*, with different staff in each.
-Once the key exists, `assets/booking-provider.js` is the only file that
-changes; the full URL format, the seven colour slots and the two traps in them
-are decoded in that file's header.
+**What it would take to take real bookings.** An onlineafspraken.nl account on
+the **Groei** tier — €32,50/month billed annually, €40,00 monthly, 2–10
+resources, 14-day free trial, no free tier. That tier lists *"widgets per
+resource"*, which is exactly the Labi/Donovan split. Once the key exists,
+`assets/booking-provider.js` is the only file that changes; the full URL
+format, the seven colour slots and the two traps in them are decoded in that
+file's header.
 
 Their REST API exists but is the wrong tool here: Pro tier only (€65/month) and
 its request signature needs the account secret at call time, which on a static
 site means publishing the salon's diary credentials to every visitor.
 
-**Until then**, the form composes a complete appointment request — service,
-price, duration, stylist, date, time, contact details — and hands it to the
+**Until then**, the form composes a complete appointment request — services,
+prices, duration, stylist, date, time, contact details — and hands it to the
 salon by e-mail. The button says *request* and the confirmation says the salon
 confirms, because until a person or a real diary answers, that is what has
 happened.
@@ -70,10 +92,8 @@ another, so only one can be in a booking; the toner sits on top of any of them.
 
 The list is genderless, by instruction. There is one cutting entry, from 35,
 priced by the length of the hair and the work it takes rather than by who is
-in the chair. No label,
-no Dutch `nl` string, no fallback row and no line of copy may reintroduce the
-split — `booking-test.mjs` greps every shipped file for gendered wording, and
-`verify.mjs` checks the rendered page including `title` and `aria-label`
+in the chair. `booking-test.mjs` greps every shipped file for gendered wording,
+and `verify.mjs` checks the rendered page including `title` and `aria-label`
 attributes, where such a word could hide without being visible.
 
 ## Data
@@ -91,20 +111,19 @@ only leaves the stylist a gap.
 
 ## Assets
 
-- **Logo** — the supplied JILL SCUTT wordmark, 782×86, lifted onto
-  transparency. Alpha comes from inverted luminance with a white-point
-  correction, so the letterforms keep their antialiasing and the margins are
-  alpha 0 exactly — the source screenshot carried faint banding rows that a
-  straight inversion left as a grey veil.
+- **Logo** — the supplied UCHI wordmark, 648×186. The source was already
+  transparent, so its own alpha is used as-is, cropped to the ink with a 2%
+  margin; WebP keeps the alpha (`yuva420p`). The reveal covers sit on its two
+  ink bands, measured off the shipped file.
+- **Favicon** — the wordmark centred on `#fcfcfc`, composited in Node so the
+  paper is exact.
 - **Hero** — two portraits that cross-fade on tap, both 1440×1920, EXIF
-  stripped, WebP at 480/720/1080/1440 with a JPEG fallback. The second was
-  tone-matched to the first by transferring the first's per-luminance colour
-  offsets, so the fade carries no colour shift.
+  stripped, WebP at 480/720/1080/1440 with a JPEG fallback. See the
+  photograph-rights note above.
 - **Fonts** — Bebas Neue and Abel, both OFL, self-hosted WOFF2. Licences ship
   alongside them in `assets/fonts/`.
 - **Zero third-party requests.** No CDN, no analytics, no cookies, on either
-  page. This is true again now the Setmore iframe is gone, and stops being true
-  the moment a planner widget is embedded.
+  page. That stops being true the moment a planner widget is embedded.
 
 ## Local preview
 
@@ -123,18 +142,22 @@ node tools/verify.mjs
 node tools/motion-check.mjs
 ```
 
-`booking-test.mjs` is 139 unit tests over the slot calculator, the service
-combinations and the price list, in Node, with no browser. It also greps every
-shipped file for gendered wording and fails if any reappears. The slot maths is the one part of this site
-that can be quietly wrong — it always renders *a* list of times, and a list of
-times looks correct no matter which ones are missing — so the expected counts
-were worked out by hand before the code was run.
+`booking-test.mjs` covers the slot calculator, the service combinations and the
+price list in Node, with no browser. It also greps every shipped file for
+gendered wording and for anything retired — earlier brand names, the old phone
+number and inbox, the preview marker, the robots exclusion tag — and fails if
+any reappears.
+The slot maths is the one part of this site that can be quietly wrong — it
+always renders *a* list of times, and a list of times looks correct no matter
+which ones are missing — so the expected counts were worked out by hand before
+the code was run.
 
 `verify.mjs` drives a real headless Chrome and clicks the site the way a
-visitor would: swaps the hero photograph, walks the entire booking flow, and
-checks the Labi/Donovan exclusion holds in both directions in the live DOM,
-that no offered time overruns the break or closing, that the published hours
-equal the bookable hours, and that the page still states its prices and hours
+visitor would: swaps the hero photograph, walks the entire booking flow, checks
+the Labi/Donovan exclusion in both directions in the live DOM, that no offered
+time overruns the break or closing, that the published hours equal the bookable
+hours, that the contact links are the final ones, that nothing on the page sits
+on top of anything else, and that the page still states its prices and hours
 with JavaScript disabled. Add `VERIFY_SHOTS=.shots` to capture screenshots.
 
 `motion-check.mjs` samples transforms over time to prove the reveal and the

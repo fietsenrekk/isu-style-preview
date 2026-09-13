@@ -1,6 +1,6 @@
 /*
-  JILL SCUTT — booking UI
-  =======================
+  UCHI — booking UI
+  =================
 
   Renders the four choices (stylist, services, day, time) and the details form,
   then hands the finished booking to whatever provider is configured in

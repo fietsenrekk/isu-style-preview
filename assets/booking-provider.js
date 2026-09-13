@@ -1,6 +1,6 @@
 /*
-  JILL SCUTT — booking provider adapter
-  =====================================
+  UCHI — booking provider adapter
+  ===============================
 
   Where a finished booking goes. Everything above this file — the exclusion
   logic, the slot maths, the whole interface — is provider-independent; this
@@ -15,7 +15,7 @@
   owns the account.
 
   ISU embeds onlineafspraken.nl. Their widget URL carries an account key that
-  identifies THEIR diary — pointing this site at it would drop Jill Scutt's
+  identifies THEIR diary — pointing this site at it would drop UCHI's
   customers into ISU's calendar, so it is not an option, and no amount of
   restyling makes it one.
 
@@ -53,7 +53,7 @@
   separate pickers, "Cut or blowdry by" and "Color by", with different staff in
   each. In other words the exclusion this file's UI implements by hand is the
   same behaviour the real platform gives you once Labi is marked as not
-  performing highlights, balayage and toner.
+  performing the colour services and the toner.
 
   Once the key exists, the whole of this adapter is replaced by an iframe.
   The URL segments, decoded by diffing the widgetConfig JSON the widget embeds
@@ -105,9 +105,10 @@
 window.BookingProvider = (function () {
   'use strict';
 
-  /* The salon's inbox. One constant, used by the adapter and by the fallback
-     link in the markup. */
-  var INBOX = 'alabivof@gmail.com';
+  /* The salon's inbox. uchi-antwerp.be was unregistered when this was written
+     (uchi.be is taken); the mailbox does not exist until the domain is bought
+     and mail is set up, and booking requests sent here bounce until then. */
+  var INBOX = 'info@uchi-antwerp.be';
 
   /* Shown under the submit button so the visitor knows what pressing it does
      before they press it. Read by booking-ui.js. */

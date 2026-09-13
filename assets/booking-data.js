@@ -1,6 +1,6 @@
 /*
-  JILL SCUTT — booking data
-  =========================
+  UCHI — booking data
+  ===================
 
   The single source of truth for opening hours, staff and the price list.
   Nothing else in the site hard-codes any of these values: the contact page's
@@ -105,7 +105,7 @@
 
 window.SHOP = {
 
-  name: 'JILL SCUTT',
+  name: 'UCHI',
 
   /* ---------------------------------------------------------------- hours -- */
 

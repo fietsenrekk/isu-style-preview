@@ -1,6 +1,6 @@
 /*
-  JILL SCUTT — booking core
-  =========================
+  UCHI — booking core
+  ===================
 
   Every decision the booking page makes, as pure functions over window.SHOP:
   which stylist can do which service, which days are open, and which start
