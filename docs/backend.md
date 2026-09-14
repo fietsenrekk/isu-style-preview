@@ -188,3 +188,36 @@ The admin-positive path (a real admin reading/writing through RLS and uploading 
 exercised, because that needs an Auth user and creating one was out of scope. The non-admin and anon
 paths were proven. After the owner's login exists, a quick check: sign in at `/admin`, confirm the
 bookings list loads, and `select public.is_admin()` returns true for that session.
+
+## Booking confirmation e-mail (migration 0007)
+
+Every confirmed booking with an e-mail address gets a confirmation through
+**Resend**: HTML, plain text and an `.ics` calendar invite. An `AFTER INSERT`
+trigger on `public.bookings` queues the HTTPS call with `pg_net`, so it only
+fires for committed bookings and can never slow down or break a booking.
+Phone bookings entered in /admin without an e-mail send nothing.
+
+- Resend key: Supabase Vault secret `resend_api_key` (sending-only key). Never in the repo.
+- Settings: `private.email_config` (single row).
+- Log: `private.email_log`; delivery answers: `select * from private.email_delivery;`
+- Preview an e-mail without sending: `select private.booking_confirmation_payload('<booking id>');`
+
+### Modes
+
+| mode | behaviour |
+|---|---|
+| `sandbox` (current) | `uchi.be` not yet verified at Resend. Sends from `onboarding@resend.dev` to `sandbox_to` (the Resend account owner) with the real client named in the subject. No client receives anything. |
+| `live` | Sends from `UCHI <info@uchi.be>` to the client, reply-to `info@uchi.be`. |
+| `off` | Sends nothing. |
+
+### Going live when the OVH domain arrives
+
+1. In OVH, add the DNS records Resend gave for `uchi.be` (domain already created in Resend, region eu-west-1):
+   - TXT `resend._domainkey` (DKIM value shown in Resend > Domains > uchi.be)
+   - MX `send` → `feedback-smtp.eu-west-1.amazonses.com`, priority 10
+   - TXT `send` → `v=spf1 include:amazonses.com ~all`
+   - CNAME `rsend` → `send.forge.rmta.net`
+   These live on the `send` / `resend._domainkey` / `rsend` sub-names, so they do not clash with OVH's own mailbox MX records for `info@uchi.be`.
+2. In Resend > Domains > uchi.be, press Verify and wait for "verified".
+3. Run: `update private.email_config set mode = 'live', updated_at = now();`
+4. When the site itself moves to uchi.be: `update private.email_config set site_url = 'https://uchi.be', updated_at = now();` (used for the logo image and the site link in the e-mail).
